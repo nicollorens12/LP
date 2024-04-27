@@ -2,6 +2,7 @@
 *
 
 # Include hm.py and hmVisitor.py
+!hm.g4
 !hm.py
 !hmVisitor.py
 !.gitignore

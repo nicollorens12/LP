@@ -16,6 +16,7 @@ application : '(' abstraction atom ')';
 
 abstraction : LAMBDA VARIABLE ARROW expression    #abstractionAnonimous 
             | function atom                       #abstractionFunction 
+            | '(' function ')' atom               #abstractionFunctionParenthesis
             ;
 
 function : '+' | '-' | '*' | '/' | '%' ;
