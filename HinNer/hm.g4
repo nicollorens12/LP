@@ -1,16 +1,22 @@
-grammar HinNer;
+grammar hm;
 
-expression : atom                                 #atomExpression
-           | application                          #applicationExpression
-           | abstraction                          #abstractionExpression
-           | '(' expression ')' ;
+expression : atom                                 #expressionAtom
+             | application                        #expressionApplication
+             | abstraction                        #expressionAbstraction
+             | '(' expression ')'                 #expressionParenthesis 
+             ;
+           
 
-atom : NUMBER                                     #numberAtom
-     | VARIABLE                                   #variableAtom ;
+atom : NUMBER                                     #atomNumber
+     | VARIABLE                                   #atomVariable
+     ;
 
-application : '(' function atom ')'               #application ;
+application : '(' abstraction atom ')';            
 
-abstraction : LAMBDA VARIABLE ARROW expression    #abstraction ;
+
+abstraction : LAMBDA VARIABLE ARROW expression    #abstractionAnonimous 
+            | function atom                       #abstractionFunction 
+            ;
 
 function : '+' | '-' | '*' | '/' | '%' ;
 

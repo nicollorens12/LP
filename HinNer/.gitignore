@@ -1,0 +1,7 @@
+# Ignore all files
+*
+
+# Include hm.py and hmVisitor.py
+!hm.py
+!hmVisitor.py
+!.gitignore
