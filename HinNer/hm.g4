@@ -1,5 +1,7 @@
 grammar hm;
 
+evaluate : expression EOF;
+
 expression : atom                                 #expressionAtom
              | application                        #expressionApplication
              | abstraction                        #expressionAbstraction
@@ -14,10 +16,11 @@ atom : NUMBER                                     #atomNumber
 application : '(' abstraction atom ')';            
 
 
-abstraction : LAMBDA VARIABLE ARROW expression    #abstractionAnonimous 
-            | function atom                       #abstractionFunction 
-            | '(' function ')' atom               #abstractionFunctionParenthesis
+abstraction : LAMBDA VARIABLE ARROW expression          #abstractionAnonimous 
+            | '(' expression ')' atom                   #abstractionExpression
+            | '(' function ')' atom                     #abstractionFunction
             ;
+
 
 function : '+' | '-' | '*' | '/' | '%' ;
 
