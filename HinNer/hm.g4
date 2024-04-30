@@ -7,18 +7,17 @@ expression : atom                                 #expressionAtom
              | abstraction                        #expressionAbstraction
              | '(' expression ')'                 #expressionParenthesis 
              ;
-           
 
 atom : NUMBER                                     #atomNumber
      | VARIABLE                                   #atomVariable
      ;
+ 
+application : application atom                    #applicationComposed
+            | '(' function ')' atom               #applicationSimple
+            ;
 
-application : '(' abstraction atom ')';            
-
-
-abstraction : LAMBDA VARIABLE ARROW expression          #abstractionAnonimous 
-            | '(' expression ')' atom                   #abstractionExpression
-            | '(' function ')' atom                     #abstractionFunction
+abstraction : LAMBDA VARIABLE ARROW application   #abstractionAnonimous 
+            | '(' function ')'                    #abstractionFunction
             ;
 
 

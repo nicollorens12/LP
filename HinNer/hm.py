@@ -73,30 +73,20 @@ def main():
     expression = st.text_area('Expresion','(+) 2 x')
 
     if st.button('Evaluate'):
-        try:
-            input_stream = InputStream(expression)  # Utiliza InputStream en lugar de FileStream
-            lexer = hmLexer(input_stream)
-            token_stream = CommonTokenStream(lexer)
-            parser = hmParser(token_stream) 
-            parser.removeErrorListeners()  # Eliminar los listeners de errores predeterminados
-            error_listener = SyntaxErrorListener()
-            parser.addErrorListener(error_listener)  # Agregar nuestro propio listener de errores
-            print("Expresion:", expression)
-
-            tree = parser.expression()
+        
+        input_stream = InputStream(expression)  # Utiliza InputStream en lugar de FileStream
+        lexer = hmLexer(input_stream)
+        token_stream = CommonTokenStream(lexer)
+        parser = hmParser(token_stream)
+        tree = parser.evaluate()
+        print(tree)
             
+        if parser.getNumberOfSyntaxErrors() != 0:
+            st.error(f"Se encontraron {parser.getNumberOfSyntaxErrors()} error(es) de sintaxis")
+        else:
             visitor = hmVisitor()
-            tree = visitor.visitEvaluate(tree)
-            dot = generate_dot(tree)
-            graphviz_chart(dot)
-            print(tree)
-            
-            if error_listener.syntax_errors > 0:
-                st.error(f"Se encontraron {error_listener.syntax_errors} error(es) de sintaxis")
-            else:
-                st.success("Expresion evaluada correctamente")
-        except Exception as e:
-            st.error(f"Error de análisis: {e}")
+            visitor.visitEvaluate(tree)
+            st.success("Expresion evaluada correctamente")
     
 
 if __name__ == '__main__':

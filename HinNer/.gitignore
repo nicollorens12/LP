@@ -6,3 +6,4 @@
 !hm.py
 !hmVisitor.py
 !.gitignore
+!Makefile
