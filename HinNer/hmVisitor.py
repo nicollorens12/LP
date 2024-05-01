@@ -104,31 +104,47 @@ class hmVisitor(ParseTreeVisitor):
         return FunctionNode(operator=operator)
     
     def generate_dot(self, node):
+        root_node = None
         if isinstance(node, ApplicationNode):
-            self.graph.add_node(pydot.Node("@"))
+            root_node = pydot.Node("@")
+            self.graph.add_node(root_node)
             if node.abstraction:
                 abstraction_node = self.generate_dot(node.abstraction)
                 if abstraction_node:
-                    self.graph.add_edge(pydot.Edge("@", abstraction_node))
+                    self.graph.add_edge(pydot.Edge(root_node, abstraction_node))
             if node.atom:
                 atom_node = self.generate_dot(node.atom)
                 if atom_node:
-                    self.graph.add_edge(pydot.Edge("@", atom_node))
+                    self.graph.add_edge(pydot.Edge(root_node, atom_node))
         elif isinstance(node, AbstractionNode):
             abstraction_node = pydot.Node("ʎ")
             self.graph.add_node(abstraction_node)
+            
+            # Add node for variable
+            if node.variable:
+                variable_node = pydot.Node(f"({node.variable})")
+                self.graph.add_node(variable_node)
+                self.graph.add_edge(pydot.Edge(abstraction_node, variable_node))
+            
             expression_node = self.generate_dot(node.expression)
             if expression_node:
+                # Create a new node for each abstraction
+                self.graph.add_node(expression_node)
                 self.graph.add_edge(pydot.Edge(abstraction_node, expression_node))
-            return abstraction_node
+            root_node = abstraction_node
         elif isinstance(node, FunctionNode):
             function_node = pydot.Node(f"({node.operator})")
             self.graph.add_node(function_node)
-            return function_node
+            root_node = function_node
         elif isinstance(node, AtomNode):
             atom_node = pydot.Node(f"{node.value}")
             self.graph.add_node(atom_node)
-            return atom_node
+            root_node = atom_node
+        
+        return root_node
+
+
+
 
     def get_graph(self):
         return self.graph.to_string()
