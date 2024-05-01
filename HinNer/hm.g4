@@ -16,8 +16,7 @@ application : application atom                    #applicationComposed
             | '(' function ')' atom               #applicationSimple
             ;
 
-abstraction : LAMBDA VARIABLE ARROW application   #abstractionAnonimous 
-            | '(' function ')'                    #abstractionFunction
+abstraction : LAMBDA VARIABLE ARROW application   #abstractionAnonimous
             ;
 
 
