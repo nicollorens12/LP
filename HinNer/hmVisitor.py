@@ -10,7 +10,7 @@ import pydot
 
 @dataclass
 class ApplicationNode:
-    abstraction: Union['AbstractionNode', 'FunctionNode']
+    expression: Union['AbstractionNode', 'FunctionNode','ApplicationNode']
     atom: Union['AtomNode']
 
 @dataclass
@@ -36,6 +36,11 @@ class hmVisitor(ParseTreeVisitor):
 
     def __init__(self):
         self.graph = pydot.Dot(graph_type='graph')
+        self.aplicationCount = 0
+        self.abstractionCount = 0
+        self.functionCount = 0
+        self.atomCount = 0
+
 
     def visitEvaluate(self, ctx:hmParser.EvaluateContext):
         print("visitEvaluate")
@@ -78,14 +83,14 @@ class hmVisitor(ParseTreeVisitor):
     def visitApplicationComposed(self, ctx:hmParser.ApplicationComposedContext):
         print("visitApplicationComposed")
         [aplication,atom] = list(ctx.getChildren())
-        node = ApplicationNode(abstraction=self.visit(aplication), atom=self.visit(atom))
+        node = ApplicationNode(expression=self.visit(aplication), atom=self.visit(atom))
         print(node)
         return node
 
     def visitApplicationSimple(self, ctx:hmParser.ApplicationSimpleContext):
         print("visitApplicationSimple")
         [_,function,_,atom] = list(ctx.getChildren())
-        node = ApplicationNode(abstraction=self.visit(function), atom=self.visit(atom))
+        node = ApplicationNode(expression=self.visit(function), atom=self.visit(atom))
         print(node)
         return node
 
@@ -106,38 +111,54 @@ class hmVisitor(ParseTreeVisitor):
     def generate_dot(self, node):
         root_node = None
         if isinstance(node, ApplicationNode):
-            root_node = pydot.Node("@")
+            root_node = pydot.Node(f"apl_{str(self.aplicationCount)}", label="@")
+            self.aplicationCount += 1
             self.graph.add_node(root_node)
-            if node.abstraction:
-                abstraction_node = self.generate_dot(node.abstraction)
-                if abstraction_node:
-                    self.graph.add_edge(pydot.Edge(root_node, abstraction_node))
+            print("Adding abstraction")
+            if node.expression:
+                expression_node = self.generate_dot(node.expression)
+                if expression_node:
+                    print("adding edge abstraction expresion")
+                    self.graph.add_edge(pydot.Edge(root_node, expression_node))
             if node.atom:
                 atom_node = self.generate_dot(node.atom)
+
                 if atom_node:
+                    print("adding edge abstraction atom")
                     self.graph.add_edge(pydot.Edge(root_node, atom_node))
-        elif isinstance(node, AbstractionNode):
-            abstraction_node = pydot.Node("ʎ")
-            self.graph.add_node(abstraction_node)
             
+        elif isinstance(node, AbstractionNode):
+            abstraction_node = pydot.Node(f"abs_{str(self.aplicationCount)}" ,label="ʎ" )
+            self.abstractionCount += 1
+            self.graph.add_node(abstraction_node)
+            print("Adding abstraction")
             # Add node for variable
             if node.variable:
-                variable_node = pydot.Node(f"({node.variable})")
+                variable_node = pydot.Node(f"var_{str(self.atomCount)}",label=f"{node.variable}")
+                self.atomCount += 1
                 self.graph.add_node(variable_node)
+                print("adding abstraction atom")
                 self.graph.add_edge(pydot.Edge(abstraction_node, variable_node))
+                print("addgin edge abstraction atom")
             
             expression_node = self.generate_dot(node.expression)
             if expression_node:
                 # Create a new node for each abstraction
+                print("adding abstraction expresion node")
                 self.graph.add_node(expression_node)
                 self.graph.add_edge(pydot.Edge(abstraction_node, expression_node))
+                print("adding abstraction expresion edge")
             root_node = abstraction_node
         elif isinstance(node, FunctionNode):
-            function_node = pydot.Node(f"({node.operator})")
+            function_node = pydot.Node(f"func_{str(self.functionCount)}",label=f"({node.operator})")
+            self.functionCount += 1
+            print("Adding node function")
             self.graph.add_node(function_node)
             root_node = function_node
         elif isinstance(node, AtomNode):
-            atom_node = pydot.Node(f"{node.value}")
+            print("adding node atom")
+            atom_node = pydot.Node(f"atom_{str(self.atomCount)}",label=f"{node.value}")
+            self.atomCount += 1
             self.graph.add_node(atom_node)
             root_node = atom_node
         
