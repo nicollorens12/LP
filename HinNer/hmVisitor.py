@@ -7,6 +7,7 @@ else:
 from dataclasses import dataclass
 from typing import Union, List
 import pydot
+import pandas as pd
 
 @dataclass
 class ApplicationNode:
@@ -40,12 +41,14 @@ class hmVisitor(ParseTreeVisitor):
         self.abstractionCount = 0
         self.functionCount = 0
         self.atomCount = 0
+        self.root_node = None
 
 
     def visitEvaluate(self, ctx:hmParser.EvaluateContext):
         print("visitEvaluate")
         print("Children: ", ctx.children)
         [expression,_] = list(ctx.getChildren())
+        self.root_node = self.visit(expression)
         return self.visit(expression)
 
     def visitExpressionAtom(self, ctx:hmParser.ExpressionAtomContext):
@@ -164,8 +167,37 @@ class hmVisitor(ParseTreeVisitor):
         
         return root_node
 
+    def generateTypeTable(self, node):
+        type_table = {}
+    
+        def assign_type(node):
+            nonlocal type_counter
+            if isinstance(node, ApplicationNode) or isinstance(node, AbstractionNode):
+                type_table[node] = type_counter
+                type_counter = chr(ord(type_counter) + 1)
+    
+                if node.expression:
+                    assign_type(node.expression)
+                if node.atom:
+                    assign_type(node.atom)
+            elif isinstance(node, FunctionNode):
+                type_table[node] = 'N->N->N'
+            elif isinstance(node, AtomNode):
+                # Omitir Atomos Variable
+                pass
+            
+        type_counter = 'a'
+        assign_type(node)
+    
+        # Convertir el diccionario en DataFrame de Pandas
+        type_df = pd.DataFrame.from_dict(type_table, orient='index', columns=['Tipo']).reset_index()
+        type_df = type_df.rename(columns={'index': 'Elemento'})
+    
+        return type_df
 
 
+    def getTable(self):
+        return self.generateTypeTable(self.root_node)
 
     def get_graph(self):
         return self.graph.to_string()

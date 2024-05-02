@@ -4,13 +4,10 @@ from hmParser import hmParser
 from hmVisitor import hmVisitor
 from antlr4.error.ErrorListener import ErrorListener
 import streamlit as st
+import pandas as pd
 from dataclasses import dataclass
 from typing import Union, List
 from streamlit import graphviz_chart
-
-
-# Ejemplo de uso:
-#expression_tree = ExpressionNode(ApplicationNode(AbstractionNode('x', AtomNode(2)), FunctionNode('+')))
 
 
 def main():
@@ -35,7 +32,8 @@ def main():
             visitor.generate_dot(semantic_tree)
             dot_representation = visitor.get_graph()
             st.graphviz_chart(dot_representation)
-
+            df = visitor.getTable()
+            st.table(df)
             st.success("Expresion evaluada correctamente")
     
 
