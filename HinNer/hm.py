@@ -21,14 +21,12 @@ def main():
         token_stream = CommonTokenStream(lexer)
         parser = hmParser(token_stream)
         tree = parser.evaluate()
-        print(tree)
             
         if parser.getNumberOfSyntaxErrors() != 0:
             st.error(f"Se encontraron {parser.getNumberOfSyntaxErrors()} error(es) de sintaxis")
         else:
             visitor = hmVisitor()
             semantic_tree = visitor.visitEvaluate(tree)
-            print(semantic_tree)
             visitor.generate_dot(semantic_tree)
             dot_representation = visitor.get_graph()
             st.graphviz_chart(dot_representation)
