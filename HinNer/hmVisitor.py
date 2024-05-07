@@ -42,6 +42,8 @@ class hmVisitor(ParseTreeVisitor):
         self.functionCount = 0
         self.atomCount = 0
         self.root_node = None
+        self.type_df = pd.DataFrame(columns=['Elemento', 'Tipo'])
+        self.current_type = 'a'
 
 
     def visitEvaluate(self, ctx:hmParser.EvaluateContext):
@@ -114,16 +116,17 @@ class hmVisitor(ParseTreeVisitor):
     def generate_dot(self, node):
         root_node = None
         if isinstance(node, ApplicationNode):
-            root_node = pydot.Node(f"apl_{str(self.aplicationCount)}", label="@")
+            root_node = pydot.Node(f"apl_{str(self.aplicationCount)}", label=f"@\n{self.current_type}")
             self.aplicationCount += 1
             self.graph.add_node(root_node)
-            
+            self.current_type = chr(ord(self.current_type) + 1)
             if node.expression:
                 expression_node = self.generate_dot(node.expression)
                 if expression_node:
                     
                     self.graph.add_edge(pydot.Edge(root_node, expression_node))
             if node.atom:
+                
                 atom_node = self.generate_dot(node.atom)
 
                 if atom_node:
@@ -131,36 +134,40 @@ class hmVisitor(ParseTreeVisitor):
                     self.graph.add_edge(pydot.Edge(root_node, atom_node))
             
         elif isinstance(node, AbstractionNode):
-            abstraction_node = pydot.Node(f"abs_{str(self.aplicationCount)}" ,label="ʎ" )
+            abstraction_node = pydot.Node(f"abs_{str(self.aplicationCount)}" ,label=f"ʎ\n{self.current_type}" )
             self.abstractionCount += 1
             self.graph.add_node(abstraction_node)
             
             # Add node for variable
             if node.variable:
-                variable_node = pydot.Node(f"var_{str(self.atomCount)}",label=f"{node.variable}")
+                self.current_type =  chr(ord(self.current_type) + 1)
+                variable_node = pydot.Node(f"var_{str(self.atomCount)}",label=f"{node.variable}\n{self.current_type}")
                 self.atomCount += 1
                 self.graph.add_node(variable_node)
-                
                 self.graph.add_edge(pydot.Edge(abstraction_node, variable_node))
-                
-            
+
             expression_node = self.generate_dot(node.expression)
             if expression_node:
+                self.current_type =  chr(ord(self.current_type) + 1)
                 # Create a new node for each abstraction
-                
                 self.graph.add_node(expression_node)
                 self.graph.add_edge(pydot.Edge(abstraction_node, expression_node))
                 
+                
             root_node = abstraction_node
         elif isinstance(node, FunctionNode):
-            function_node = pydot.Node(f"func_{str(self.functionCount)}",label=f"({node.operator})")
+            function_node = pydot.Node(f"func_{str(self.functionCount)}",label=f"({node.operator})\n(N->(N->N))")
             self.functionCount += 1
             
             self.graph.add_node(function_node)
             root_node = function_node
+
         elif isinstance(node, AtomNode):
+            if isinstance(node.value, int):
+                atom_node = pydot.Node(f"atom_{str(self.atomCount)}",label=f"{node.value}\nN")
+            else:
+                atom_node = pydot.Node(f"atom_{str(self.atomCount)}",label=f"{node.value}\n{self.current_type}")
             
-            atom_node = pydot.Node(f"atom_{str(self.atomCount)}",label=f"{node.value}")
             self.atomCount += 1
             self.graph.add_node(atom_node)
             root_node = atom_node
@@ -168,13 +175,11 @@ class hmVisitor(ParseTreeVisitor):
         return root_node
 
     def generateTypeTable(self, node):
-        type_df = pd.DataFrame(columns=['Elemento', 'Tipo'])
-    
+        
         def assign_type(node, type_df):
             if isinstance(node, FunctionNode):
-                if node.operator.isdigit():
-                    new_row = pd.DataFrame({'Elemento': [node.operator], 'Tipo': ['N->N->N']})
-                    type_df = pd.concat([type_df, new_row], ignore_index=True)
+                new_row = pd.DataFrame({'Elemento': [node.operator], 'Tipo': ['(N->(N->N))']})
+                type_df = pd.concat([type_df, new_row], ignore_index=True)
             elif isinstance(node, AtomNode) and isinstance(node.value, int):
                 new_row = pd.DataFrame({'Elemento': [str(node.value)], 'Tipo': ['N']})
                 type_df = pd.concat([type_df, new_row], ignore_index=True)
@@ -184,22 +189,17 @@ class hmVisitor(ParseTreeVisitor):
             elif isinstance(node, AbstractionNode):
                 type_df = assign_type(node.expression, type_df)
             return type_df
+
+        self.type_df = assign_type(node, self.type_df)
     
-        type_df = assign_type(node, type_df)
-    
-        return type_df
-
-
-
-
-
-
-
+        return self.type_df
 
     def getTable(self):
         return self.generateTypeTable(self.root_node)
 
     def get_graph(self):
         return self.graph.to_string()
+    
+    
 
 del hmParser

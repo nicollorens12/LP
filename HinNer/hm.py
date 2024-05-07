@@ -28,10 +28,11 @@ def main():
             visitor = hmVisitor()
             semantic_tree = visitor.visitEvaluate(tree)
             visitor.generate_dot(semantic_tree)
-            dot_representation = visitor.get_graph()
-            st.graphviz_chart(dot_representation)
             df = visitor.getTable()
             st.table(df)
+            dot_representation = visitor.get_graph()
+            st.graphviz_chart(dot_representation)
+            
             st.success("Expresion evaluada correctamente")
     
 
