@@ -115,7 +115,6 @@ class hmVisitor(ParseTreeVisitor):
         return FunctionNode(operator=operator)
     
     def generate_dot(self, node):
-        print("entro a generate dot, varTypeMap es", self.varTypeMap, "y el nodo es", node)
         root_node = None
         if isinstance(node, ApplicationNode):
             root_node = pydot.Node(f"apl_{str(self.aplicationCount)}", label=f"@\n{self.current_type}")
@@ -127,7 +126,7 @@ class hmVisitor(ParseTreeVisitor):
                 expression_node = self.generate_dot(node.expression)
                 self.graph.add_edge(pydot.Edge(root_node, expression_node))
             if node.atom:
-                print("Voy a generar el nodo atom", node.atom)
+                
                 atom_node = self.generate_dot(node.atom)
                 self.graph.add_edge(pydot.Edge(root_node, atom_node))
             
@@ -138,7 +137,12 @@ class hmVisitor(ParseTreeVisitor):
             self.graph.add_node(abstraction_node)
 
             if node.variable:
-                variable_node = pydot.Node(f"var_{str(self.atomCount)}",label=f"{node.variable}\n{self.current_type}")
+                if node.variable in self.varTypeMap:
+                    variable_node = pydot.Node(f"var_{str(self.atomCount)}",label=f"{node.variable}\n{self.varTypeMap[node.variable]}")
+                else:
+                    self.varTypeMap[node.variable] = self.current_type
+                    variable_node = pydot.Node(f"var_{str(self.atomCount)}",label=f"{node.variable}\n{self.current_type}")
+                    
                 self.current_type = chr(ord(self.current_type)+1)
                 self.atomCount += 1
                 self.graph.add_node(variable_node)
