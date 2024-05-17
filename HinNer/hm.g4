@@ -1,29 +1,36 @@
 grammar hm;
 
-evaluate : expression EOF;
+evaluate : (expression | typeAssign) EOF;
 
-expression : atom                                 #expressionAtom
-             | application                        #expressionApplication
-             | abstraction                        #expressionAbstraction
-             | '(' expression ')'                 #expressionParenthesis 
-             ;
+typeAssign : (atom|function) '::' typeExpression;
 
-atom : NUMBER                                     #atomNumber
-     | VARIABLE                                   #atomVariable
-     ;
- 
-application : application atom                    #applicationComposed
-            | '(' function ')' atom               #applicationSimple
+typeExpression : VARIABLE ('->' typeExpression)?                     #typeExpressionBasic
+               | '(' typeExpression ')' ('->' typeExpression)*   #typeExpressionParenthesis
+               ;
+
+expression : atom                                                #expressionAtom
+             | application                                       #expressionApplication
+             | abstraction                                       #expressionAbstraction
+             | '(' expression ')'                                #expressionParenthesis 
+             ;           
+
+atom : NUMBER                                                    #atomNumber
+     | VARIABLE                                                  #atomVariable
+     ;              
+
+application : application atom                                   #applicationComposed
+            | function  atom                                     #applicationSimple
+            ;            
+
+abstraction : LAMBDA VARIABLE ARROW application                  #abstractionAnonimous
             ;
 
-abstraction : LAMBDA VARIABLE ARROW application   #abstractionAnonimous
-            ;
 
-
-function : '+' | '-' | '*' | '/' | '%' ;
+function : '(' ('+' | '-' | '*' | '/' | '%') ')' ;
 
 NUMBER : [0-9]+ ;
 VARIABLE : [a-zA-Z][a-zA-Z0-9_]* ;
+TYPE : [a-zA-Z][a-zA-Z0-9_]* ;
 LAMBDA: '\\';
 ARROW: '->';
 WS : [ \t\r\n]+ -> skip ;

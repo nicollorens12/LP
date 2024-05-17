@@ -7,34 +7,48 @@ import streamlit as st
 import pandas as pd
 from dataclasses import dataclass
 from typing import Union, List
-from streamlit import graphviz_chart
+import pydot
 
+# Define the function to load and cache the type_df
+@st.cache_data
+def load_type_df():
+    return pd.DataFrame(columns=['Elemento', 'Tipo'])
 
 def main():
     st.markdown("""## HiNer Interpreter Nico Llorens\nIngrese una expresion en el cuadro de texto y presione el botón "Evaluate" para obtener el resultado.""")
-    expression = st.text_area('Expresion','\\x->(+) 2 x')
+    expression = st.text_area('Expresion', '2 :: N')  # \\x->(+) 2 x
+
+    if 'type_df' not in st.session_state:
+        st.session_state.type_df = load_type_df()
 
     if st.button('Evaluate'):
-        
         input_stream = InputStream(expression)  # Utiliza InputStream en lugar de FileStream
         lexer = hmLexer(input_stream)
         token_stream = CommonTokenStream(lexer)
         parser = hmParser(token_stream)
+        
         tree = parser.evaluate()
-            
+        visitor = hmVisitor()
+        visitor.type_df = st.session_state.type_df  # Load cached DataFrame
+        
         if parser.getNumberOfSyntaxErrors() != 0:
             st.error(f"Se encontraron {parser.getNumberOfSyntaxErrors()} error(es) de sintaxis")
         else:
-            visitor = hmVisitor()
             semantic_tree = visitor.visitEvaluate(tree)
-            visitor.generate_dot(semantic_tree)
-            df = visitor.getTable()
+            st.session_state.type_df = visitor.getTable()  # Update cached DataFrame
+            df = st.session_state.type_df
             st.table(df)
-            dot_representation = visitor.get_graph()
-            st.graphviz_chart(dot_representation)
-            
-            st.success("Expresion evaluada correctamente")
-    
+            if visitor.evaluateType == 'typeAssign':
+                st.success("Tipo asignado correctamente")
+            else:
+                visitor.generate_dot(semantic_tree)
+                dot_representation = visitor.get_graph()
+                st.graphviz_chart(dot_representation)
+                st.success("Expresion evaluada correctamente")
+                
+    if st.button('Reset'):
+        st.cache_data.clear()
+        st.session_state.type_df = load_type_df()
 
 if __name__ == '__main__':
     main()

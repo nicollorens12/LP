@@ -45,31 +45,67 @@ class hmVisitor(ParseTreeVisitor):
         self.type_df = pd.DataFrame(columns=['Elemento', 'Tipo'])
         self.varTypeMap = dict()
         self.current_type = 'a'
-
+        self.evaluateType = None
 
     def visitEvaluate(self, ctx:hmParser.EvaluateContext):
+        print("Visiting evaluate")
+        [input,_] = list(ctx.getChildren())
+        rule_index = ctx.getRuleIndex()
+        if ctx.typeAssign():
+            self.evaluateType = 'typeAssign'
+        elif ctx.expression():
+            self.evaluateType = 'expression'
+        else:
+            self.evaluateType = "Error!"
+
+        self.root_node = self.visit(input)
+        print(input.getText())
+        return self.root_node
+    
+    # Visit a parse tree produced by hmParser#typeAssign.
+    def visitTypeAssign(self, ctx:hmParser.TypeAssignContext):
+        self.evaluateType = 'typeAssign'
+        [element,_,type_expression] = list(ctx.getChildren())
+        elem = element.getText()
+        print("Type exp is:", type_expression.getText())
+        type_exp = self.visit(type_expression)
+        new_row = pd.DataFrame({'Elemento': [elem], 'Tipo': [type_exp]})
+        self.type_df = pd.concat([self.type_df, new_row], ignore_index=True)
         
-        [expression,_] = list(ctx.getChildren())
-        self.root_node = self.visit(expression)
-        return self.visit(expression)
+        
+
+    def visitTypeExpressionBasic(self, ctx:hmParser.TypeExpressionBasicContext):
+        print("Visiting type expression basic")
+        type_text = ctx.VARIABLE().getText()
+        if ctx.typeExpression():
+            type_expression = self.visit(ctx.typeExpression())
+            return f"{type_text}->{type_expression}"
+        else:
+            return type_text
+
+    def visitTypeExpressionParenthesis(self, ctx:hmParser.TypeExpressionParenthesisContext):
+        print("Visiting type expression parenthesis")
+        type_expression1 = self.visit(ctx.typeExpression(0))
+        type_expression2 = self.visit(ctx.typeExpression(1))
+        return f"({type_expression1})->{type_expression2}"
 
     def visitExpressionAtom(self, ctx:hmParser.ExpressionAtomContext):
-        
+        print("Visiting expression atom")
         [atom] = list(ctx.getChildren())
         return self.visit(atom)
 
     def visitExpressionApplication(self, ctx:hmParser.ExpressionApplicationContext):
-        
+        print("Visiting expression application")
         [application] = list(ctx.getChildren())
         return self.visit(application)
 
     def visitExpressionAbstraction(self, ctx:hmParser.ExpressionAbstractionContext):
-        
+        print("Visiting expression abstraction")
         [abstraction] = list(ctx.getChildren())
         return self.visit(abstraction)
 
     def visitExpressionParenthesis(self, ctx:hmParser.ExpressionParenthesisContext):
-        
+        print("Visiting expression parenthesis")
         [_,expression,_] = list(ctx.getChildren())
         return self.visit(expression)
     
