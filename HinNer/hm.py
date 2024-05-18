@@ -14,9 +14,10 @@ import pydot
 def load_type_df():
     return pd.DataFrame(columns=['Elemento', 'Tipo'])
 
+
 def main():
     st.markdown("""## HiNer Interpreter Nico Llorens\nIngrese una expresion en el cuadro de texto y presione el botón "Evaluate" para obtener el resultado.""")
-    expression = st.text_area('Expresion', '2 :: N')  # \\x->(+) 2 x
+    expression = st.text_area('Expresion', '(+) :: N->N->N')  # \\x->(+) 2 x
 
     if 'type_df' not in st.session_state:
         st.session_state.type_df = load_type_df()
@@ -41,9 +42,12 @@ def main():
             if visitor.evaluateType == 'typeAssign':
                 st.success("Tipo asignado correctamente")
             else:
+
                 visitor.generate_dot(semantic_tree)
                 dot_representation = visitor.get_graph()
                 st.graphviz_chart(dot_representation)
+                print(visitor.variable_types)
+                visitor.infer_application_type(visitor.root_node)
                 st.success("Expresion evaluada correctamente")
                 
     if st.button('Reset'):

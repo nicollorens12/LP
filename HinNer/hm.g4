@@ -5,7 +5,7 @@ evaluate : (expression | typeAssign) EOF;
 typeAssign : (atom|function) '::' typeExpression;
 
 typeExpression : VARIABLE ('->' typeExpression)?                     #typeExpressionBasic
-               | '(' typeExpression ')' ('->' typeExpression)*   #typeExpressionParenthesis
+               | '(' typeExpression ')' ('->' typeExpression)*        #typeExpressionParenthesis
                ;
 
 expression : atom                                                #expressionAtom

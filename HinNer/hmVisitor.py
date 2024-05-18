@@ -13,23 +13,23 @@ import pandas as pd
 class ApplicationNode:
     expression: Union['AbstractionNode', 'FunctionNode', 'ApplicationNode']
     atom: Union['AtomNode']
+    element: str  # Nuevo campo para almacenar el elemento asociado al nodo
 
 @dataclass
 class AbstractionNode:
     variable: str
-    expression: Union['ExpressionNode', 'AbstractionNode', 'FunctionNode']
+    expression: Union['AbstractionNode', 'FunctionNode']
+    element: str  # Nuevo campo para almacenar el elemento asociado al nodo
 
 @dataclass
 class FunctionNode:
-    operator: str
+    element: str
 
 @dataclass
 class AtomNode:
-    value: Union[int, str]
+    element: Union[int, str]
 
-@dataclass
-class ExpressionNode:
-    node: Union[ApplicationNode, AbstractionNode, FunctionNode, AtomNode]
+
 
 class hmVisitor(ParseTreeVisitor):
 
@@ -46,31 +46,32 @@ class hmVisitor(ParseTreeVisitor):
         self.evaluateType = None
 
     def visitEvaluate(self, ctx: hmParser.EvaluateContext):
-        print("Visiting evaluate")
         [input, _] = list(ctx.getChildren())
-        rule_index = ctx.getRuleIndex()
         if ctx.typeAssign():
             self.evaluateType = 'typeAssign'
         elif ctx.expression():
             self.evaluateType = 'expression'
+            for index, row in self.type_df.iterrows():
+                element = row['Elemento']
+                tipo = row['Tipo']
+                self.variable_types[element] = tipo
+
         else:
             self.evaluateType = "Error!"
 
         self.root_node = self.visit(input)
-        print(input.getText())
         return self.root_node
 
     def visitTypeAssign(self, ctx: hmParser.TypeAssignContext):
         self.evaluateType = 'typeAssign'
         [element, _, type_expression] = list(ctx.getChildren())
         elem = element.getText()
-        print("Type exp is:", type_expression.getText())
         type_exp = self.visit(type_expression)
         new_row = pd.DataFrame({'Elemento': [elem], 'Tipo': [type_exp]})
         self.type_df = pd.concat([self.type_df, new_row], ignore_index=True)
+        self.variable_types[elem] = type_exp
 
     def visitTypeExpressionBasic(self, ctx: hmParser.TypeExpressionBasicContext):
-        print("Visiting type expression basic")
         type_text = ctx.VARIABLE().getText()
         if ctx.typeExpression():
             type_expression = self.visit(ctx.typeExpression())
@@ -79,70 +80,69 @@ class hmVisitor(ParseTreeVisitor):
             return type_text
 
     def visitTypeExpressionParenthesis(self, ctx: hmParser.TypeExpressionParenthesisContext):
-        print("Visiting type expression parenthesis")
-        type_expression1 = self.visit(ctx.typeExpression(0))
-        type_expression2 = self.visit(ctx.typeExpression(1))
-        return f"({type_expression1})->{type_expression2}"
+        [_,type_expression1,_,_,type_expression2] = list(ctx.getChildren())
+        vtype_expression1 = self.visit(type_expression1)
+        vtype_expression2 = self.visit(type_expression2)
+        return f"({vtype_expression1})->{vtype_expression2}"
 
     def visitExpressionAtom(self, ctx: hmParser.ExpressionAtomContext):
-        print("Visiting expression atom")
         [atom] = list(ctx.getChildren())
         return self.visit(atom)
 
     def visitExpressionApplication(self, ctx: hmParser.ExpressionApplicationContext):
-        print("Visiting expression application")
         [application] = list(ctx.getChildren())
         return self.visit(application)
 
     def visitExpressionAbstraction(self, ctx: hmParser.ExpressionAbstractionContext):
-        print("Visiting expression abstraction")
         [abstraction] = list(ctx.getChildren())
         return self.visit(abstraction)
 
     def visitExpressionParenthesis(self, ctx: hmParser.ExpressionParenthesisContext):
-        print("Visiting expression parenthesis")
         [_, expression, _] = list(ctx.getChildren())
         return self.visit(expression)
 
     def visitAtomNumber(self, ctx: hmParser.AtomNumberContext):
         value = int(ctx.NUMBER().getText())
-        return AtomNode(value=value)
+        return AtomNode(element=value)
 
     def visitAtomVariable(self, ctx: hmParser.AtomVariableContext):
         variable = ctx.VARIABLE().getText()
-        return AtomNode(value=variable)
+        return AtomNode(element=variable)
 
     def visitApplicationComposed(self, ctx: hmParser.ApplicationComposedContext):
         [aplication, atom] = list(ctx.getChildren())
-        node = ApplicationNode(expression=self.visit(aplication), atom=self.visit(atom))
+        element = f"apl_{self.aplicationCount}"
+        self.aplicationCount += 1
+        node = ApplicationNode(expression=self.visit(aplication), atom=self.visit(atom), element=element)
         return node
 
     def visitApplicationSimple(self, ctx: hmParser.ApplicationSimpleContext):
         [function, atom] = list(ctx.getChildren())
-        node = ApplicationNode(expression=self.visit(function), atom=self.visit(atom))
+        element = f"apl_{self.aplicationCount}"
+        self.aplicationCount += 1
+        node = ApplicationNode(expression=self.visit(function), atom=self.visit(atom), element=element)
         return node
 
     def visitAbstractionAnonimous(self, ctx: hmParser.AbstractionAnonimousContext):
         [_, variable, _, expression] = list(ctx.getChildren())
         variable_name = variable.getText()
-        abstraction_node = AbstractionNode(variable=variable_name, expression=self.visit(expression))
+        element = f"abs_{self.abstractionCount}"
+        self.abstractionCount += 1
+        abstraction_node = AbstractionNode(variable=variable_name, expression=self.visit(expression), element=element)
         return abstraction_node
 
     def visitFunction(self, ctx: hmParser.FunctionContext):
-        operator = ctx.getText()
-        return FunctionNode(operator=operator)
+        element = ctx.getText()
+        return FunctionNode(element=element)
 
     def generate_dot(self, node):
         def get_or_assign_type(element):
             element_str = str(element).strip()  # Asegurarse de que el elemento sea una cadena sin espacios adicionales
-
             # Verificar si el elemento está en type_df
             if element_str in self.type_df['Elemento'].values:
-                print("Para el elemento", element_str, "entro en type_df")
                 return self.type_df.loc[self.type_df['Elemento'] == element_str, 'Tipo'].values[0]
             # Verificar si el elemento está en variable_types
             elif element_str in self.variable_types:
-                print("Para el elemento", element_str, "entro en variable_types")
                 return self.variable_types[element_str]
             else:
                 assigned_type = self.current_type
@@ -153,8 +153,8 @@ class hmVisitor(ParseTreeVisitor):
         root_node = None
 
         if isinstance(node, ApplicationNode):
-            label = f"@\n{get_or_assign_type(f'apl_{self.aplicationCount}')}"
-            root_node = pydot.Node(f"apl_{str(self.aplicationCount)}", label=label)
+            label = f"@\n{get_or_assign_type(node.element)}"
+            root_node = pydot.Node(f"{node.element}", label=label)
             self.aplicationCount += 1
             self.graph.add_node(root_node)
             
@@ -166,8 +166,8 @@ class hmVisitor(ParseTreeVisitor):
                 self.graph.add_edge(pydot.Edge(root_node, atom_node))
 
         elif isinstance(node, AbstractionNode):
-            label = f"ʎ\n{get_or_assign_type(f'abs_{self.abstractionCount}')}"
-            abstraction_node = pydot.Node(f"abs_{str(self.abstractionCount)}", label=label)
+            label = f"ʎ\n{get_or_assign_type(node.element)}"
+            abstraction_node = pydot.Node(f"{node.element}", label=label)
             self.abstractionCount += 1
             self.graph.add_node(abstraction_node)
 
@@ -185,14 +185,14 @@ class hmVisitor(ParseTreeVisitor):
             root_node = abstraction_node
 
         elif isinstance(node, FunctionNode):
-            label = f"({node.operator})\n{get_or_assign_type(node.operator)}"
+            label = f"({node.element})\n{get_or_assign_type(node.element)}"
             function_node = pydot.Node(f"func_{str(self.functionCount)}", label=label)
             self.functionCount += 1
             self.graph.add_node(function_node)
             root_node = function_node
 
         elif isinstance(node, AtomNode):
-            label = f"{node.value}\n{get_or_assign_type(node.value)}"
+            label = f"{node.element}\n{get_or_assign_type(node.element)}"
             atom_node = pydot.Node(f"atom_{str(self.atomCount)}", label=label)
             self.atomCount += 1
             self.graph.add_node(atom_node)
@@ -205,5 +205,21 @@ class hmVisitor(ParseTreeVisitor):
 
     def get_graph(self):
         return self.graph.to_string()
+    
+    def infer_application_type(self,node):
+        if isinstance(node, ApplicationNode):
+            right_child_type = self.variable_types[str(node.atom.element)]
+            
+            if isinstance(node.expression, ApplicationNode):
+                left_child_type = self.variable_types[node.expression.element]
+            elif isinstance(node.expression, AbstractionNode):
+                left_child_type = self.variable_types[node.expression.element]
+            else:
+                left_child_type = self.variable_types[node.expression.element]
+            parent_type_aux = self.variable_types[node.element]
+            print(f"Type {left_child_type} = {right_child_type} -> {parent_type_aux}")
+            
+
+        
 
 del hmParser
