@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Union
 import pydot
 import pandas as pd
+import re
 
 @dataclass
 class ApplicationNode:
@@ -207,18 +208,83 @@ class hmVisitor(ParseTreeVisitor):
         return self.graph.to_string()
     
     def infer_application_type(self,node):
+        print("START INFERENCE")
         if isinstance(node, ApplicationNode):
             right_child_type = self.variable_types[str(node.atom.element)]
-            
+            print(f"Node atom is: {node.atom.element}")
             if isinstance(node.expression, ApplicationNode):
+                self.infer_application_type(node.expression)
                 left_child_type = self.variable_types[node.expression.element]
+                print(f"Node expression is: {node.expression.element}")
             elif isinstance(node.expression, AbstractionNode):
                 left_child_type = self.variable_types[node.expression.element]
+                print(f"Node expression is: {node.expression.element}")
             else:
                 left_child_type = self.variable_types[node.expression.element]
+                print(f"Node expression is: {node.expression.element}")
             parent_type_aux = self.variable_types[node.element]
-            print(f"Type {left_child_type} = {right_child_type} -> {parent_type_aux}")
+            #left_child_type = parent_type -> right_child_type
+            result = self.eq_union(left_child_type, right_child_type, parent_type_aux)
+            if result[0]:
+                self.variable_types[node.element] = result[3]
+                self.variable_types[node.expression.element] = result[1]
+                self.variable_types[node.atom.element] = result[2]
+                print(f"Variable types: {self.variable_types}")
+                return True
+            else:
+                return False
+        else:
+            return True
+                
             
+    def eq_union(self, typeleft, type1, type2):
+        print(f"Typeleft: {typeleft}, Type1: {type1}, Type2: {type2}")
+        # Caso cuando typeleft es exactamente la concatenación de type1 y type2
+        if typeleft == type1 + '->' + type2:
+            print("Equal thing")
+            return (True,typeleft, type1, type2)
+        
+        elif len(typeleft) == (len(type1) + 2 + len(type2)) :
+            print("Equal size")
+            # Verificar si typeleft contiene '->' en alguna parte
+            if '->' in typeleft:
+                print("FLAG")
+                # Encontrar la última aparición de '->' en typeleft
+                last_arrow_index = typeleft.rindex('->')
+                # Extraer type1 hasta antes del último '->'
+                type1 = typeleft[:last_arrow_index]
+                # Extraer type2 desde después del último '->'
+                type2 = typeleft[last_arrow_index + 2:]
+                print(f"Type1: {type1}, Type2: {type2}")
+                return (True,typeleft, type1, type2)
+            else:
+                return (False, typeleft, type1, type2)
+            
+        # Caso cuando el largo de typeleft es mayor que la suma de los largos de type1 y type2
+        elif len(typeleft) > (len(type1) + 2 + len(type2)):
+            print("Greater than")
+            # Verificar si typeleft empieza con type1
+            if typeleft.startswith(type1):
+                # Extraer el resto de typeleft después de type1
+                remaining = typeleft[len(type1):]
+                if remaining.startswith("->"):
+                    remaining = remaining[2:]
+                print(f"Remaining: {remaining}")
+                return (True,typeleft, type1, remaining)
+
+            # Verificar si typeleft termina con type2
+            if typeleft.endswith(type2):
+                # Extraer el inicio de typeleft antes de type2
+                remaining = typeleft[:-len(type2)]
+                print(f"Remaining: {remaining}")
+                if remaining.endswith("->"):
+                    remaining = remaining[:-2]
+                return (True,typeleft, remaining, type2)
+        
+        else:
+            print("ELSE")
+            return (True,type1, type1, type2)
+
 
         
 

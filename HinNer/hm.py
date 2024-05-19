@@ -47,8 +47,15 @@ def main():
                 dot_representation = visitor.get_graph()
                 st.graphviz_chart(dot_representation)
                 print(visitor.variable_types)
-                visitor.infer_application_type(visitor.root_node)
-                st.success("Expresion evaluada correctamente")
+                result = visitor.infer_application_type(visitor.root_node)
+                if(not result):
+                    st.error("Error en la inferencia de tipos")
+                else:
+                    visitor.generate_dot(visitor.root_node)
+                    dot_representation = visitor.get_graph()
+                    st.graphviz_chart(dot_representation)
+                    st.table(visitor.variable_types)
+                    st.success("Expresion evaluada correctamente")
                 
     if st.button('Reset'):
         st.cache_data.clear()
