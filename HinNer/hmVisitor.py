@@ -217,6 +217,45 @@ class hmVisitor(ParseTreeVisitor):
     def get_graph(self):
         return self.graph.to_string()
     
+    def infer_type(self):
+        if isinstance(self.root_node, ApplicationNode):
+            return self.infer_application_type(self.root_node)
+        elif isinstance(self.root_node, AbstractionNode):
+            return self.infer_abstraction_type(self.root_node)
+
+    def infer_abstraction_type(self,node):
+        print(f"Variable types: {self.variable_types}")
+        if isinstance(node, AbstractionNode):
+            
+            if isinstance(node.expression, ApplicationNode):
+                self.infer_application_type(node.expression)
+                right_child_type = self.variable_types[node.expression.element]
+            elif isinstance(node.expression, AbstractionNode):
+                self.infer_abstraction_type(node.expression)
+                right_child_type = self.variable_types[node.expression.element]
+            else:
+                right_child_type = self.variable_types[node.expression.element]
+            parent_type_aux = self.variable_types[node.element]
+            left_child_type = self.variable_types[node.variable]
+            result = self.eq_union(parent_type_aux, left_child_type, right_child_type)
+
+            if result[0]:
+                self.variable_types[node.element] = result[1]
+                self.variable_types[node.expression.element] = result[2]
+                self.variable_types[node.variable] = result[3]
+
+                if parent_type_aux != result[3]:
+                    self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_type_aux, result[3]]], columns=['Old type', 'New type'])])
+                if left_child_type != result[1]:
+                    self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child_type, result[1]]], columns=['Old type', 'New type'])])
+                if right_child_type != result[2]:
+                    self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child_type, result[2]]], columns=['Old type', 'New type'])])
+                return True
+            else:
+                return False
+        else:
+            return True
+        
     def infer_application_type(self,node):
         if isinstance(node, ApplicationNode):
             right_child_type = self.variable_types[str(node.atom.element)]
@@ -229,7 +268,7 @@ class hmVisitor(ParseTreeVisitor):
                 left_child_type = self.variable_types[node.expression.element]
             parent_type_aux = self.variable_types[node.element]
             result = self.eq_union(left_child_type, right_child_type, parent_type_aux)
-            
+
             if result[0]:
                 self.variable_types[node.element] = result[3]
                 self.variable_types[node.expression.element] = result[1]
@@ -291,7 +330,9 @@ class hmVisitor(ParseTreeVisitor):
                     remaining = remaining[:-2]
                 return (True,typeleft, remaining, type2)
             return (False, typeleft, type1, type2)
-        
+        elif len(typeleft) == 1:
+            typeleft = type1 + '->' + type2
+            return (True,typeleft, type1, type2)
         
         print("ELSE")
         return (False,type1, type1, type2)

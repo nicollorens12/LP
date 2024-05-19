@@ -43,10 +43,9 @@ def main():
                 st.success("Tipo asignado correctamente")
             else:
                 visitor.generate_dot(semantic_tree)
-                print(f"Variable type is :{visitor.variable_types}")
                 dot_representation = visitor.get_graph()
                 st.graphviz_chart(dot_representation)
-                result = visitor.infer_application_type(visitor.root_node)
+                result = visitor.infer_type()
                 if(not result):
                     st.error("Error en la inferencia de tipos")
                 else:
