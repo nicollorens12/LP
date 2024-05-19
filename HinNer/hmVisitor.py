@@ -45,6 +45,7 @@ class hmVisitor(ParseTreeVisitor):
         self.variable_types = {}
         self.current_type = 'a'
         self.evaluateType = None
+        self.inference_change_table = None
 
     def visitEvaluate(self, ctx: hmParser.EvaluateContext):
         [input, _] = list(ctx.getChildren())
@@ -229,7 +230,13 @@ class hmVisitor(ParseTreeVisitor):
                 self.variable_types[node.element] = result[3]
                 self.variable_types[node.expression.element] = result[1]
                 self.variable_types[node.atom.element] = result[2]
-                print(f"Variable types: {self.variable_types}")
+
+                if parent_type_aux != result[3]:
+                    self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_type_aux, result[3]]], columns=['Old type', 'New type'])])
+                if left_child_type != result[1]:
+                    self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child_type, result[1]]], columns=['Old type', 'New type'])])
+                if right_child_type != result[2]:
+                    self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child_type, result[2]]], columns=['Old type', 'New type'])])
                 return True
             else:
                 return False
