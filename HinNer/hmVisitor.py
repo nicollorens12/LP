@@ -105,16 +105,19 @@ class hmVisitor(ParseTreeVisitor):
 
     def visitAtomNumber(self, ctx: hmParser.AtomNumberContext):
         value = int(ctx.NUMBER().getText())
+        self.get_or_assign_type(value)
         return AtomNode(element=value)
 
     def visitAtomVariable(self, ctx: hmParser.AtomVariableContext):
         variable = ctx.VARIABLE().getText()
+        self.get_or_assign_type(variable)
         return AtomNode(element=variable)
 
     def visitApplicationComposed(self, ctx: hmParser.ApplicationComposedContext):
         [aplication, atom] = list(ctx.getChildren())
         element = f"apl_{self.aplicationCount}"
         self.aplicationCount += 1
+        self.get_or_assign_type(element)
         node = ApplicationNode(expression=self.visit(aplication), atom=self.visit(atom), element=element)
         return node
 
@@ -122,6 +125,7 @@ class hmVisitor(ParseTreeVisitor):
         [function, atom] = list(ctx.getChildren())
         element = f"apl_{self.aplicationCount}"
         self.aplicationCount += 1
+        self.get_or_assign_type(element)
         node = ApplicationNode(expression=self.visit(function), atom=self.visit(atom), element=element)
         return node
 
@@ -130,15 +134,16 @@ class hmVisitor(ParseTreeVisitor):
         variable_name = variable.getText()
         element = f"abs_{self.abstractionCount}"
         self.abstractionCount += 1
+        self.get_or_assign_type(element)
         abstraction_node = AbstractionNode(variable=variable_name, expression=self.visit(expression), element=element)
         return abstraction_node
 
     def visitFunction(self, ctx: hmParser.FunctionContext):
         element = ctx.getText()
+        self.get_or_assign_type(element)
         return FunctionNode(element=element)
 
-    def generate_dot(self, node):
-        def get_or_assign_type(element):
+    def get_or_assign_type(self,element):
             element_str = str(element).strip()  # Asegurarse de que el elemento sea una cadena sin espacios adicionales
             # Verificar si el elemento está en type_df
             if element_str in self.type_df['Elemento'].values:
@@ -152,10 +157,10 @@ class hmVisitor(ParseTreeVisitor):
                 self.variable_types[element_str] = assigned_type
                 return assigned_type
 
+    def generate_dot(self, node):
         root_node = None
-
         if isinstance(node, ApplicationNode):
-            label = f"@\n{get_or_assign_type(node.element)}"
+            label = f"@\n{self.get_or_assign_type(node.element)}"
             root_node = pydot.Node(f"{node.element}", label=label)
             self.aplicationCount += 1
             self.graph.add_node(root_node)
@@ -168,13 +173,13 @@ class hmVisitor(ParseTreeVisitor):
                 self.graph.add_edge(pydot.Edge(root_node, atom_node))
 
         elif isinstance(node, AbstractionNode):
-            label = f"ʎ\n{get_or_assign_type(node.element)}"
+            label = f"ʎ\n{self.get_or_assign_type(node.element)}"
             abstraction_node = pydot.Node(f"{node.element}", label=label)
             self.abstractionCount += 1
             self.graph.add_node(abstraction_node)
 
             if node.variable:
-                variable_type = get_or_assign_type(node.variable)
+                variable_type = self.get_or_assign_type(node.variable)
                 variable_node = pydot.Node(f"var_{str(self.atomCount)}", label=f"{node.variable}\n{variable_type}")
                 self.atomCount += 1
                 self.graph.add_node(variable_node)
@@ -187,20 +192,24 @@ class hmVisitor(ParseTreeVisitor):
             root_node = abstraction_node
 
         elif isinstance(node, FunctionNode):
-            label = f"({node.element})\n{get_or_assign_type(node.element)}"
+            label = f"({node.element})\n{self.get_or_assign_type(node.element)}"
             function_node = pydot.Node(f"func_{str(self.functionCount)}", label=label)
             self.functionCount += 1
             self.graph.add_node(function_node)
             root_node = function_node
 
         elif isinstance(node, AtomNode):
-            label = f"{node.element}\n{get_or_assign_type(node.element)}"
+            label = f"{node.element}\n{self.get_or_assign_type(node.element)}"
             atom_node = pydot.Node(f"atom_{str(self.atomCount)}", label=label)
             self.atomCount += 1
             self.graph.add_node(atom_node)
             root_node = atom_node
 
         return root_node
+    
+    def generate_new_dot(self):
+        self.graph = pydot.Dot(graph_type='graph')
+        self.generate_dot(self.root_node)
 
     def getTable(self):
         return self.type_df
@@ -209,23 +218,18 @@ class hmVisitor(ParseTreeVisitor):
         return self.graph.to_string()
     
     def infer_application_type(self,node):
-        print("START INFERENCE")
         if isinstance(node, ApplicationNode):
             right_child_type = self.variable_types[str(node.atom.element)]
-            print(f"Node atom is: {node.atom.element}")
             if isinstance(node.expression, ApplicationNode):
                 self.infer_application_type(node.expression)
                 left_child_type = self.variable_types[node.expression.element]
-                print(f"Node expression is: {node.expression.element}")
             elif isinstance(node.expression, AbstractionNode):
                 left_child_type = self.variable_types[node.expression.element]
-                print(f"Node expression is: {node.expression.element}")
             else:
                 left_child_type = self.variable_types[node.expression.element]
-                print(f"Node expression is: {node.expression.element}")
             parent_type_aux = self.variable_types[node.element]
-            #left_child_type = parent_type -> right_child_type
             result = self.eq_union(left_child_type, right_child_type, parent_type_aux)
+            
             if result[0]:
                 self.variable_types[node.element] = result[3]
                 self.variable_types[node.expression.element] = result[1]
@@ -264,8 +268,7 @@ class hmVisitor(ParseTreeVisitor):
                 type2 = typeleft[last_arrow_index + 2:]
                 print(f"Type1: {type1}, Type2: {type2}")
                 return (True,typeleft, type1, type2)
-            else:
-                return (False, typeleft, type1, type2)
+            return (False, typeleft, type1, type2)
             
         # Caso cuando el largo de typeleft es mayor que la suma de los largos de type1 y type2
         elif len(typeleft) > (len(type1) + 2 + len(type2)):
@@ -287,10 +290,11 @@ class hmVisitor(ParseTreeVisitor):
                 if remaining.endswith("->"):
                     remaining = remaining[:-2]
                 return (True,typeleft, remaining, type2)
+            return (False, typeleft, type1, type2)
         
-        else:
-            print("ELSE")
-            return (True,type1, type1, type2)
+        
+        print("ELSE")
+        return (False,type1, type1, type2)
 
 
         
