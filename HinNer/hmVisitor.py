@@ -243,12 +243,16 @@ class hmVisitor(ParseTreeVisitor):
                 self.variable_types[node.element] = result[1]
                 self.variable_types[node.expression.element] = result[2]
                 self.variable_types[node.variable] = result[3]
+                print("abs result: ", result)
+                if parent_type_aux != result[1]:
+                    print(f"ABS Parent type: {parent_type_aux}, Result: {result[1]}")
+                    self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_type_aux, result[1]]], columns=['Old type', 'New type'])])
+                if left_child_type != result[3]:
+                    print(f"ABS Left child type: {left_child_type}, Result: {result[3]}")
 
-                if parent_type_aux != result[3]:
-                    self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_type_aux, result[3]]], columns=['Old type', 'New type'])])
-                if left_child_type != result[1]:
-                    self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child_type, result[1]]], columns=['Old type', 'New type'])])
+                    self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child_type, result[3]]], columns=['Old type', 'New type'])])
                 if right_child_type != result[2]:
+                    print(f"ABS Right child type: {right_child_type}, Result: {result[2]}")
                     self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child_type, result[2]]], columns=['Old type', 'New type'])])
                 return True
             else:
@@ -275,10 +279,13 @@ class hmVisitor(ParseTreeVisitor):
                 self.variable_types[node.atom.element] = result[2]
 
                 if parent_type_aux != result[3]:
+                    print(f"Parent type: {parent_type_aux}, Result: {result[3]}")
                     self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_type_aux, result[3]]], columns=['Old type', 'New type'])])
                 if left_child_type != result[1]:
+                    print(f"Left child type: {left_child_type}, Result: {result[1]}")
                     self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child_type, result[1]]], columns=['Old type', 'New type'])])
                 if right_child_type != result[2]:
+                    print(f"Right child type: {right_child_type}, Result: {result[2]}")
                     self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child_type, result[2]]], columns=['Old type', 'New type'])])
                 return True
             else:
@@ -291,41 +298,28 @@ class hmVisitor(ParseTreeVisitor):
         print(f"Typeleft: {typeleft}, Type1: {type1}, Type2: {type2}")
         # Caso cuando typeleft es exactamente la concatenación de type1 y type2
         if typeleft == type1 + '->' + type2:
-            print("Equal thing")
             return (True,typeleft, type1, type2)
         
         elif len(typeleft) == (len(type1) + 2 + len(type2)) :
-            print("Equal size")
             # Verificar si typeleft contiene '->' en alguna parte
             if '->' in typeleft:
-                print("FLAG")
-                # Encontrar la última aparición de '->' en typeleft
                 last_arrow_index = typeleft.rindex('->')
-                # Extraer type1 hasta antes del último '->'
+
                 type1 = typeleft[:last_arrow_index]
-                # Extraer type2 desde después del último '->'
                 type2 = typeleft[last_arrow_index + 2:]
-                print(f"Type1: {type1}, Type2: {type2}")
                 return (True,typeleft, type1, type2)
+            
             return (False, typeleft, type1, type2)
             
-        # Caso cuando el largo de typeleft es mayor que la suma de los largos de type1 y type2
-        elif len(typeleft) > (len(type1) + 2 + len(type2)):
-            print("Greater than")
-            # Verificar si typeleft empieza con type1
+        elif len(typeleft) > (len(type1) + 2 + len(type2)):          
             if typeleft.startswith(type1):
-                # Extraer el resto de typeleft después de type1
                 remaining = typeleft[len(type1):]
                 if remaining.startswith("->"):
                     remaining = remaining[2:]
-                print(f"Remaining: {remaining}")
                 return (True,typeleft, type1, remaining)
-
-            # Verificar si typeleft termina con type2
+            
             if typeleft.endswith(type2):
-                # Extraer el inicio de typeleft antes de type2
                 remaining = typeleft[:-len(type2)]
-                print(f"Remaining: {remaining}")
                 if remaining.endswith("->"):
                     remaining = remaining[:-2]
                 return (True,typeleft, remaining, type2)
@@ -334,7 +328,6 @@ class hmVisitor(ParseTreeVisitor):
             typeleft = type1 + '->' + type2
             return (True,typeleft, type1, type2)
         
-        print("ELSE")
         return (False,type1, type1, type2)
 
 
