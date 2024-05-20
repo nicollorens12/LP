@@ -8,31 +8,43 @@ from dataclasses import dataclass
 from typing import Union
 import pydot
 import pandas as pd
+import re
 
 @dataclass
 class ApplicationNode:
     expression: Union['AbstractionNode', 'FunctionNode', 'ApplicationNode']
     atom: Union['AtomNode']
+    element: str 
 
 @dataclass
 class AbstractionNode:
     variable: str
-    expression: Union['ExpressionNode', 'AbstractionNode', 'FunctionNode']
+    expression: Union['AbstractionNode', 'FunctionNode']
+    element: str  
 
 @dataclass
 class FunctionNode:
-    operator: str
+    element: str
 
 @dataclass
 class AtomNode:
-    value: Union[int, str]
+    element: Union[int, str]
 
+# Clase para manejar los tipos de las variables
 @dataclass
-class ExpressionNode:
-    node: Union[ApplicationNode, AbstractionNode, FunctionNode, AtomNode]
+class VariableType:
+    type: str
+    assigned_by_user: bool
 
+
+class TypeInferenceError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+        
 class hmVisitor(ParseTreeVisitor):
-
+    
     def __init__(self):
         self.graph = pydot.Dot(graph_type='graph')
         self.aplicationCount = 0
@@ -44,33 +56,35 @@ class hmVisitor(ParseTreeVisitor):
         self.variable_types = {}
         self.current_type = 'a'
         self.evaluateType = None
+        self.inference_change_table = None
 
     def visitEvaluate(self, ctx: hmParser.EvaluateContext):
-        print("Visiting evaluate")
         [input, _] = list(ctx.getChildren())
-        rule_index = ctx.getRuleIndex()
         if ctx.typeAssign():
             self.evaluateType = 'typeAssign'
         elif ctx.expression():
             self.evaluateType = 'expression'
+            for index, row in self.type_df.iterrows():
+                element = row['Elemento']
+                tipo = row['Tipo']
+                self.variable_types[element] = VariableType(type=tipo, assigned_by_user=True)
+
         else:
             self.evaluateType = "Error!"
 
         self.root_node = self.visit(input)
-        print(input.getText())
         return self.root_node
 
     def visitTypeAssign(self, ctx: hmParser.TypeAssignContext):
         self.evaluateType = 'typeAssign'
         [element, _, type_expression] = list(ctx.getChildren())
         elem = element.getText()
-        print("Type exp is:", type_expression.getText())
         type_exp = self.visit(type_expression)
         new_row = pd.DataFrame({'Elemento': [elem], 'Tipo': [type_exp]})
         self.type_df = pd.concat([self.type_df, new_row], ignore_index=True)
+        self.variable_types[elem] = VariableType(type=type_exp, assigned_by_user=True)
 
     def visitTypeExpressionBasic(self, ctx: hmParser.TypeExpressionBasicContext):
-        print("Visiting type expression basic")
         type_text = ctx.VARIABLE().getText()
         if ctx.typeExpression():
             type_expression = self.visit(ctx.typeExpression())
@@ -79,82 +93,89 @@ class hmVisitor(ParseTreeVisitor):
             return type_text
 
     def visitTypeExpressionParenthesis(self, ctx: hmParser.TypeExpressionParenthesisContext):
-        print("Visiting type expression parenthesis")
-        type_expression1 = self.visit(ctx.typeExpression(0))
-        type_expression2 = self.visit(ctx.typeExpression(1))
-        return f"({type_expression1})->{type_expression2}"
+        [_,type_expression1,_,_,type_expression2] = list(ctx.getChildren())
+        vtype_expression1 = self.visit(type_expression1)
+        vtype_expression2 = self.visit(type_expression2)
+        return f"({vtype_expression1})->{vtype_expression2}"
 
     def visitExpressionAtom(self, ctx: hmParser.ExpressionAtomContext):
-        print("Visiting expression atom")
         [atom] = list(ctx.getChildren())
         return self.visit(atom)
 
     def visitExpressionApplication(self, ctx: hmParser.ExpressionApplicationContext):
-        print("Visiting expression application")
         [application] = list(ctx.getChildren())
         return self.visit(application)
 
     def visitExpressionAbstraction(self, ctx: hmParser.ExpressionAbstractionContext):
-        print("Visiting expression abstraction")
         [abstraction] = list(ctx.getChildren())
         return self.visit(abstraction)
 
     def visitExpressionParenthesis(self, ctx: hmParser.ExpressionParenthesisContext):
-        print("Visiting expression parenthesis")
         [_, expression, _] = list(ctx.getChildren())
         return self.visit(expression)
 
     def visitAtomNumber(self, ctx: hmParser.AtomNumberContext):
         value = int(ctx.NUMBER().getText())
-        return AtomNode(value=value)
+        self.get_or_assign_type(value)
+        return AtomNode(element=value)
 
     def visitAtomVariable(self, ctx: hmParser.AtomVariableContext):
         variable = ctx.VARIABLE().getText()
-        return AtomNode(value=variable)
+        self.get_or_assign_type(variable)
+        return AtomNode(element=variable)
 
     def visitApplicationComposed(self, ctx: hmParser.ApplicationComposedContext):
         [aplication, atom] = list(ctx.getChildren())
-        node = ApplicationNode(expression=self.visit(aplication), atom=self.visit(atom))
+        element = f"apl_{self.aplicationCount}"
+        self.aplicationCount += 1
+        self.get_or_assign_type(element)
+        node = ApplicationNode(expression=self.visit(aplication), atom=self.visit(atom), element=element)
         return node
 
     def visitApplicationSimple(self, ctx: hmParser.ApplicationSimpleContext):
         [function, atom] = list(ctx.getChildren())
-        node = ApplicationNode(expression=self.visit(function), atom=self.visit(atom))
+        element = f"apl_{self.aplicationCount}"
+        self.aplicationCount += 1
+        self.get_or_assign_type(element)
+        node = ApplicationNode(expression=self.visit(function), atom=self.visit(atom), element=element)
         return node
 
     def visitAbstractionAnonimous(self, ctx: hmParser.AbstractionAnonimousContext):
         [_, variable, _, expression] = list(ctx.getChildren())
         variable_name = variable.getText()
-        abstraction_node = AbstractionNode(variable=variable_name, expression=self.visit(expression))
+        element = f"abs_{self.abstractionCount}"
+        self.abstractionCount += 1
+        self.get_or_assign_type(element)
+        abstraction_node = AbstractionNode(variable=variable_name, expression=self.visit(expression), element=element)
         return abstraction_node
 
     def visitFunction(self, ctx: hmParser.FunctionContext):
-        operator = ctx.getText()
-        return FunctionNode(operator=operator)
+        element = ctx.getText()
+        self.get_or_assign_type(element)
+        return FunctionNode(element=element)
+
+    def get_or_assign_type(self,element):
+        element_str = str(element).strip()  # Asegurarse de que el elemento sea un string sin espacios adicionales
+   
+        if element_str in self.type_df['Elemento'].values:
+            type_value = self.type_df.loc[self.type_df['Elemento'] == element_str, 'Tipo'].values[0]
+            if element_str not in self.variable_types:
+                self.variable_types[element_str] = VariableType(type=type_value, assigned_by_user=True)
+            return type_value
+
+        elif element_str in self.variable_types:
+            return self.variable_types[element_str].type
+        else:
+            assigned_type = self.current_type
+            self.current_type = chr(ord(self.current_type) + 1)
+            self.variable_types[element_str] = VariableType(type=assigned_type, assigned_by_user=False)
+            return assigned_type
 
     def generate_dot(self, node):
-        def get_or_assign_type(element):
-            element_str = str(element).strip()  # Asegurarse de que el elemento sea una cadena sin espacios adicionales
-
-            # Verificar si el elemento está en type_df
-            if element_str in self.type_df['Elemento'].values:
-                print("Para el elemento", element_str, "entro en type_df")
-                return self.type_df.loc[self.type_df['Elemento'] == element_str, 'Tipo'].values[0]
-            # Verificar si el elemento está en variable_types
-            elif element_str in self.variable_types:
-                print("Para el elemento", element_str, "entro en variable_types")
-                return self.variable_types[element_str]
-            else:
-                assigned_type = self.current_type
-                self.current_type = chr(ord(self.current_type) + 1)
-                self.variable_types[element_str] = assigned_type
-                return assigned_type
-
         root_node = None
-
         if isinstance(node, ApplicationNode):
-            label = f"@\n{get_or_assign_type(f'apl_{self.aplicationCount}')}"
-            root_node = pydot.Node(f"apl_{str(self.aplicationCount)}", label=label)
+            label = f"@\n{self.get_or_assign_type(node.element)}"
+            root_node = pydot.Node(f"{node.element}", label=label)
             self.aplicationCount += 1
             self.graph.add_node(root_node)
             
@@ -166,13 +187,13 @@ class hmVisitor(ParseTreeVisitor):
                 self.graph.add_edge(pydot.Edge(root_node, atom_node))
 
         elif isinstance(node, AbstractionNode):
-            label = f"ʎ\n{get_or_assign_type(f'abs_{self.abstractionCount}')}"
-            abstraction_node = pydot.Node(f"abs_{str(self.abstractionCount)}", label=label)
+            label = f"ʎ\n{self.get_or_assign_type(node.element)}"
+            abstraction_node = pydot.Node(f"{node.element}", label=label)
             self.abstractionCount += 1
             self.graph.add_node(abstraction_node)
 
             if node.variable:
-                variable_type = get_or_assign_type(node.variable)
+                variable_type = self.get_or_assign_type(node.variable)
                 variable_node = pydot.Node(f"var_{str(self.atomCount)}", label=f"{node.variable}\n{variable_type}")
                 self.atomCount += 1
                 self.graph.add_node(variable_node)
@@ -185,25 +206,132 @@ class hmVisitor(ParseTreeVisitor):
             root_node = abstraction_node
 
         elif isinstance(node, FunctionNode):
-            label = f"({node.operator})\n{get_or_assign_type(node.operator)}"
+            label = f"({node.element})\n{self.get_or_assign_type(node.element)}"
             function_node = pydot.Node(f"func_{str(self.functionCount)}", label=label)
             self.functionCount += 1
             self.graph.add_node(function_node)
             root_node = function_node
 
         elif isinstance(node, AtomNode):
-            label = f"{node.value}\n{get_or_assign_type(node.value)}"
+            label = f"{node.element}\n{self.get_or_assign_type(node.element)}"
             atom_node = pydot.Node(f"atom_{str(self.atomCount)}", label=label)
             self.atomCount += 1
             self.graph.add_node(atom_node)
             root_node = atom_node
 
         return root_node
+    
+    def generate_new_dot(self):
+        self.graph = pydot.Dot(graph_type='graph')
+        self.generate_dot(self.root_node)
 
     def getTable(self):
         return self.type_df
 
     def get_graph(self):
         return self.graph.to_string()
+    
+    def infer_types(self):
+        if isinstance(self.root_node, ApplicationNode):
+            return self.infer_application_type(self.root_node)
+        elif isinstance(self.root_node, AbstractionNode):
+            return self.infer_abstraction_type(self.root_node)
 
-del hmParser
+    def infer_abstraction_type(self,node):
+        print(f"Variable types: {self.variable_types}")
+        if isinstance(node, AbstractionNode):
+            
+            if isinstance(node.expression, ApplicationNode):
+                result_aux = self.infer_application_type(node.expression)
+                if not result_aux:
+                    return False
+                right_child = self.variable_types[node.expression.element]
+            elif isinstance(node.expression, AbstractionNode):
+                result_aux =self.infer_abstraction_type(node.expression)
+                if not result_aux:
+                    return False
+                right_child = self.variable_types[node.expression.element]
+            else:
+                right_child = self.variable_types[node.expression.element]
+            parent_aux = self.variable_types[node.element]
+            left_child = self.variable_types[node.variable]
+            result = self.eq_union(parent_aux, left_child, right_child)
+
+            if parent_aux.type != result[0]:
+                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_aux.type, result[0]]], columns=['Old type', 'New type'])])
+            if left_child.type != result[2]:
+                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child.type, result[2]]], columns=['Old type', 'New type'])])
+            if right_child.type != result[1]:
+                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child.type, result[1]]], columns=['Old type', 'New type'])])
+
+            self.variable_types[node.element].type = result[0]
+            self.variable_types[node.expression.element].type = result[1]
+            self.variable_types[node.variable].type = result[2]
+            return True
+            
+        else:
+            return False
+        
+    def infer_application_type(self,node):
+        print(f"Variable types: {self.variable_types}")
+        if isinstance(node, ApplicationNode):
+            right_child = self.variable_types[str(node.atom.element)]
+            if isinstance(node.expression, ApplicationNode):
+                result_aux = self.infer_application_type(node.expression)
+                if not result_aux:
+                    return False
+                left_child = self.variable_types[node.expression.element]
+            elif isinstance(node.expression, AbstractionNode):
+                result_aux = self.infer_abstraction_type(node.expression)
+                if not result_aux:
+                    return False
+                left_child = self.variable_types[node.expression.element]
+            else:
+                left_child  = self.variable_types[node.expression.element]
+            parent_aux = self.variable_types[node.element]
+            result = self.eq_union(left_child, right_child, parent_aux)
+           
+            if parent_aux.type != result[2]:
+                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_aux.type, result[2]]], columns=['Old type', 'New type'])])
+            if left_child.type != result[0]:
+                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child.type, result[0]]], columns=['Old type', 'New type'])])
+            if right_child.type != result[1]:
+                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child.type, result[1]]], columns=['Old type', 'New type'])])
+
+            self.variable_types[node.element].type = result[2]
+            self.variable_types[node.expression.element].type = result[0]
+            self.variable_types[str(node.atom.element)].type = result[1]
+            return True
+        else:
+            return False
+       
+    def eq_union(self, typeleft, type1, type2):
+        if typeleft.type == type1.type + '->' + type2.type:
+            return (typeleft.type, type1.type, type2.type)
+        
+        elif len(typeleft.type) == (len(type1.type) + 2 + len(type2.type)):
+            if '->' in typeleft.type:
+                last_arrow_index = typeleft.type.rindex('->')
+                type1_aux = typeleft.type[:last_arrow_index]
+                type2_aux = typeleft.type[last_arrow_index + 2:]
+                return (typeleft.type, type1_aux, type2_aux)
+            raise TypeInferenceError("Typeleft.type does not contain '->' in the expected position")
+        
+        elif len(typeleft.type) > (len(type1.type) + 2 + len(type2.type)):
+            if typeleft.type.startswith(type1.type):
+                remaining = typeleft.type[len(type1.type):]
+                if remaining.startswith("->"):
+                    remaining = remaining[2:]
+                return (typeleft.type, type1.type, remaining)
+            elif typeleft.type.endswith(type2.type):
+                remaining = typeleft.type[:-len(type2.type)]
+                if remaining.endswith("->"):
+                    remaining = remaining[:-2]
+                return (typeleft.type, remaining, type2.type)
+            raise TypeInferenceError(f"{typeleft.type.split('->')[0]} vs {type1.type.split('->')[0]}")
+        
+        elif len(typeleft.type) == 1:
+            typeleft_aux = type1.type + '->' + type2.type
+            return (typeleft_aux, type1.type, type2.type)
+        
+        raise TypeInferenceError("Unknown error in type inference")
