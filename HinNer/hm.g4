@@ -18,7 +18,7 @@ atom : NUMBER                                                    #atomNumber
      | VARIABLE                                                  #atomVariable
      ;              
 
-application : application atom                                   #applicationComposed
+application : application expression                             #applicationComposed
             | function expression                                #applicationSimple
             ;            
 
