@@ -19,7 +19,7 @@ atom : NUMBER                                                    #atomNumber
      ;              
 
 application : application atom                                   #applicationComposed
-            | function atom                                      #applicationSimple
+            | function expression                                #applicationSimple
             ;            
 
 abstraction : LAMBDA VARIABLE ARROW application                  #abstractionAnonimous

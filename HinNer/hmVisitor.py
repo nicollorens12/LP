@@ -125,7 +125,7 @@ class hmVisitor(ParseTreeVisitor):
         return AtomNode(element=variable)
 
     def visitApplicationComposed(self, ctx: hmParser.ApplicationComposedContext):
-        [_,aplication, _,atom] = list(ctx.getChildren())
+        [aplication,atom] = list(ctx.getChildren())
         element = f"apl_{self.aplicationCount}"
         self.aplicationCount += 1
         self.get_or_assign_type(element)
