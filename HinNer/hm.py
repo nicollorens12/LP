@@ -2,12 +2,8 @@ from antlr4 import InputStream, CommonTokenStream
 from hmLexer import hmLexer
 from hmParser import hmParser
 from hmVisitor import hmVisitor, TypeInferenceError
-from antlr4.error.ErrorListener import ErrorListener
 import streamlit as st
 import pandas as pd
-from dataclasses import dataclass
-from typing import Union, List
-import pydot
 
 # Define the function to load and cache the type_df
 @st.cache_data

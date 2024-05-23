@@ -125,7 +125,7 @@ class hmVisitor(ParseTreeVisitor):
         return AtomNode(element=variable)
 
     def visitApplicationComposed(self, ctx: hmParser.ApplicationComposedContext):
-        [aplication, atom] = list(ctx.getChildren())
+        [_,aplication, _,atom] = list(ctx.getChildren())
         element = f"apl_{self.aplicationCount}"
         self.aplicationCount += 1
         self.get_or_assign_type(element)
@@ -238,7 +238,6 @@ class hmVisitor(ParseTreeVisitor):
             return self.infer_abstraction_type(self.root_node)
 
     def infer_abstraction_type(self,node):
-        print(f"Variable types: {self.variable_types}")
         if isinstance(node, AbstractionNode):
             
             if isinstance(node.expression, ApplicationNode):
@@ -256,26 +255,37 @@ class hmVisitor(ParseTreeVisitor):
             parent_aux = self.variable_types[node.element]
             left_child = self.variable_types[node.variable]
             result = self.eq_union(parent_aux, left_child, right_child)
+            print("This is an abstraction node")
+            print(f"eq: {left_child.type} = {right_child.type} -> {parent_aux.type}")
+            print("Results are:", result)
 
             if parent_aux.type != result[0]:
+                print(f"Assigning to {node.element} the type {result[0]}")
+                self.variable_types[node.element].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_aux.type, result[0]]], columns=['Old type', 'New type'])])
             if left_child.type != result[2]:
+                print(f"Assigning to {node.variable} the type {result[2]}")
+                self.variable_types[node.variable].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child.type, result[2]]], columns=['Old type', 'New type'])])
             if right_child.type != result[1]:
+                print(f"Assigning to {node.expression.element} the type {result[1]}")
+                self.variable_types[node.expression.element].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child.type, result[1]]], columns=['Old type', 'New type'])])
 
             self.variable_types[node.element].type = result[0]
             self.variable_types[node.expression.element].type = result[1]
             self.variable_types[node.variable].type = result[2]
+
+            print("Variable type now is:", self.variable_types , "\n")
             return True
             
         else:
             return False
         
     def infer_application_type(self,node):
-        print(f"Variable types: {self.variable_types}")
         if isinstance(node, ApplicationNode):
             right_child = self.variable_types[str(node.atom.element)]
+            print("right_child", right_child)
             if isinstance(node.expression, ApplicationNode):
                 result_aux = self.infer_application_type(node.expression)
                 if not result_aux:
@@ -287,51 +297,68 @@ class hmVisitor(ParseTreeVisitor):
                     return False
                 left_child = self.variable_types[node.expression.element]
             else:
-                left_child  = self.variable_types[node.expression.element]
-            parent_aux = self.variable_types[node.element]
-            result = self.eq_union(left_child, right_child, parent_aux)
-           
-            if parent_aux.type != result[2]:
-                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_aux.type, result[2]]], columns=['Old type', 'New type'])])
-            if left_child.type != result[0]:
-                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child.type, result[0]]], columns=['Old type', 'New type'])])
-            if right_child.type != result[1]:
-                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child.type, result[1]]], columns=['Old type', 'New type'])])
 
-            self.variable_types[node.element].type = result[2]
+                left_child  = self.variable_types[node.expression.element]
+            print("left_child", left_child)
+            parent_aux = self.variable_types[node.element]
+            print("parent_aux", parent_aux)
+            
+            result = self.eq_union(left_child, right_child, parent_aux)
+            print("This is an application node")
+            print(f"eq: {left_child.type} = {right_child.type} -> {parent_aux.type}")
+            print("Results are:", result)
+            
+            if parent_aux.type != result[1]:
+                print(f"Assigning to {node.element} the type {result[1]}")
+                self.variable_types[node.element].assigned_by_user = True
+                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_aux.type, result[1]]], columns=['Old type', 'New type'])])
+            if left_child.type != result[0]:
+                print(f"Assigning to {node.expression.element} the type {result[0]}")
+                self.variable_types[node.expression.element].assigned_by_user = True
+                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child.type, result[0]]], columns=['Old type', 'New type'])])
+            if right_child.type != result[2]:
+                print(f"Assigning to {node.atom.element} the type {result[2]}")
+                self.variable_types[str(node.atom.element)].assigned_by_user = True
+                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child.type, result[2]]], columns=['Old type', 'New type'])])
+
+            self.variable_types[node.element].type = result[1]
             self.variable_types[node.expression.element].type = result[0]
-            self.variable_types[str(node.atom.element)].type = result[1]
+            self.variable_types[str(node.atom.element)].type = result[2]
             return True
         else:
             return False
        
     def eq_union(self, typeleft, type1, type2):
-        if typeleft.type == type1.type + '->' + type2.type:
-            return (typeleft.type, type1.type, type2.type)
-        
-        elif len(typeleft.type) == (len(type1.type) + 2 + len(type2.type)):
+        if typeleft.assigned_by_user and not type1.assigned_by_user and not type2.assigned_by_user:
+            print("FLAG!")
             if '->' in typeleft.type:
                 last_arrow_index = typeleft.type.rindex('->')
                 type1_aux = typeleft.type[:last_arrow_index]
                 type2_aux = typeleft.type[last_arrow_index + 2:]
+                print(f"I'm returning {typeleft.type} = {type1_aux} , {type2_aux}")
                 return (typeleft.type, type1_aux, type2_aux)
-            raise TypeInferenceError("Typeleft.type does not contain '->' in the expected position")
-        
-        elif len(typeleft.type) > (len(type1.type) + 2 + len(type2.type)):
+            raise TypeInferenceError(f"Impossible to infer type for {typeleft.type} vs {type1.type} and {type2.type}")
+        elif typeleft.assigned_by_user and type1.assigned_by_user and not type2.assigned_by_user:
             if typeleft.type.startswith(type1.type):
                 remaining = typeleft.type[len(type1.type):]
                 if remaining.startswith("->"):
                     remaining = remaining[2:]
                 return (typeleft.type, type1.type, remaining)
-            elif typeleft.type.endswith(type2.type):
+            raise TypeInferenceError(f"{typeleft.type.split('->')[0]} vs {type1.type.split('->')[0]}")
+        
+        elif typeleft.assigned_by_user and not type1.assigned_by_user and type2.assigned_by_user:
+            if typeleft.type.endswith(type2.type):
                 remaining = typeleft.type[:-len(type2.type)]
                 if remaining.endswith("->"):
                     remaining = remaining[:-2]
                 return (typeleft.type, remaining, type2.type)
-            raise TypeInferenceError(f"{typeleft.type.split('->')[0]} vs {type1.type.split('->')[0]}")
+            raise TypeInferenceError(f"{typeleft.type.split('->')[0]} vs {type2.type.split('->')[0]}")
         
-        elif len(typeleft.type) == 1:
-            typeleft_aux = type1.type + '->' + type2.type
-            return (typeleft_aux, type1.type, type2.type)
+        elif not typeleft.assigned_by_user and type1.assigned_by_user and type2.assigned_by_user:
+            #make typeleft.assign_by_user = True??
+            return(type1.type + '->' + type2.type, type1.type, type2.type)
+        
+        elif not typeleft.assigned_by_user and not type1.assigned_by_user and not type2.assigned_by_user:
+            return (typeleft.type, type1.type, type2.type)
         
         raise TypeInferenceError("Unknown error in type inference")
