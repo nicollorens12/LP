@@ -377,4 +377,10 @@ class hmVisitor(ParseTreeVisitor):
         elif not typeleft.assigned_by_user and not type1.assigned_by_user and not type2.assigned_by_user:
             return (typeleft.type, type1.type, type2.type)
         
-        raise TypeInferenceError("Unknown error in type inference")
+        elif not typeleft.assigned_by_user and not type1.assigned_by_user and type2.assigned_by_user:
+            return(type1.type + '->' + type2.type, type1.type, type2.type)
+            print("ei")
+        
+        print(f"Flag! {typeleft.assigned_by_user} {type1.assigned_by_user} {type2.assigned_by_user}")
+
+        raise TypeInferenceError("Unknown ckrmelwe in type inference")

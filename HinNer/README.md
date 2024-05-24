@@ -31,3 +31,19 @@ Per executar aquest programa s'ha proporcionat un `Makefile` amb 3 regles:
 
 - **run**: Corre l'aplicació mitjançant streamlit.
 
+## Que es pot fer?
+
+Aplicacions:
+(+) 2 x
+
+Abstraccions:
+\x -> (+) 2 x
+
+Aplicacion anidada:
+1::N
+2::N
+3::N
+(+) :: N->N->N
+(\z -> (+) ((+) 1 2) z)
+
+
