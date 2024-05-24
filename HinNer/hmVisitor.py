@@ -12,8 +12,8 @@ import re
 
 @dataclass
 class ApplicationNode:
-    expression: Union['AbstractionNode', 'FunctionNode', 'ApplicationNode']
-    atom: Union['AtomNode']
+    root: Union['ApplicationNode','FunctionNode']
+    expression: Union['AbstractionNode', 'FunctionNode', 'ApplicationNode','AtomNode']
     element: str 
 
 @dataclass
@@ -125,19 +125,19 @@ class hmVisitor(ParseTreeVisitor):
         return AtomNode(element=variable)
 
     def visitApplicationComposed(self, ctx: hmParser.ApplicationComposedContext):
-        [_,aplication, _,atom] = list(ctx.getChildren())
+        [root,expression] = list(ctx.getChildren())
         element = f"apl_{self.aplicationCount}"
         self.aplicationCount += 1
         self.get_or_assign_type(element)
-        node = ApplicationNode(expression=self.visit(aplication), atom=self.visit(atom), element=element)
+        node = ApplicationNode(expression=self.visit(expression), root=self.visit(root), element=element)
         return node
 
     def visitApplicationSimple(self, ctx: hmParser.ApplicationSimpleContext):
-        [function, atom] = list(ctx.getChildren())
+        [root, expression] = list(ctx.getChildren())
         element = f"apl_{self.aplicationCount}"
         self.aplicationCount += 1
         self.get_or_assign_type(element)
-        node = ApplicationNode(expression=self.visit(function), atom=self.visit(atom), element=element)
+        node = ApplicationNode(expression=self.visit(expression), root=self.visit(root), element=element)
         return node
 
     def visitAbstractionAnonimous(self, ctx: hmParser.AbstractionAnonimousContext):
@@ -178,13 +178,13 @@ class hmVisitor(ParseTreeVisitor):
             root_node = pydot.Node(f"{node.element}", label=label)
             self.aplicationCount += 1
             self.graph.add_node(root_node)
-            
+            if node.root:
+                aux_node = self.generate_dot(node.root)
+                self.graph.add_edge(pydot.Edge(root_node, aux_node))
             if node.expression:
                 expression_node = self.generate_dot(node.expression)
                 self.graph.add_edge(pydot.Edge(root_node, expression_node))
-            if node.atom:
-                atom_node = self.generate_dot(node.atom)
-                self.graph.add_edge(pydot.Edge(root_node, atom_node))
+            
 
         elif isinstance(node, AbstractionNode):
             label = f"ʎ\n{self.get_or_assign_type(node.element)}"
@@ -239,7 +239,6 @@ class hmVisitor(ParseTreeVisitor):
 
     def infer_abstraction_type(self,node):
         if isinstance(node, AbstractionNode):
-            
             if isinstance(node.expression, ApplicationNode):
                 result_aux = self.infer_application_type(node.expression)
                 if not result_aux:
@@ -256,6 +255,7 @@ class hmVisitor(ParseTreeVisitor):
             left_child = self.variable_types[node.variable]
             result = self.eq_union(parent_aux, left_child, right_child)
             print("This is an abstraction node")
+            print(f"Elements are: {node.element}, {node.variable}, {node.expression.element}")
             print(f"eq: {left_child.type} = {right_child.type} -> {parent_aux.type}")
             print("Results are:", result)
 
@@ -271,59 +271,75 @@ class hmVisitor(ParseTreeVisitor):
                 print(f"Assigning to {node.expression.element} the type {result[1]}")
                 self.variable_types[node.expression.element].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child.type, result[1]]], columns=['Old type', 'New type'])])
-
+            
             self.variable_types[node.element].type = result[0]
             self.variable_types[node.expression.element].type = result[1]
             self.variable_types[node.variable].type = result[2]
 
-            print("Variable type now is:", self.variable_types , "\n")
             return True
             
         else:
             return False
         
-    def infer_application_type(self,node):
+    def infer_application_type(self,node): #Pending remake for two cases function expression or application atom
         if isinstance(node, ApplicationNode):
-            right_child = self.variable_types[str(node.atom.element)]
-            print("right_child", right_child)
+            left_child = None
+            right_child = None
+            parent_aux = None
+            print(f"Infering types for {node.element}")
+            if isinstance(node.root, ApplicationNode):
+                result_aux = self.infer_application_type(node.root)
+                if not result_aux:
+                    return False
+                left_child = self.variable_types[node.root.element]
+            elif isinstance(node.root, FunctionNode):
+                left_child = self.variable_types[node.root.element]
+                
+            print(f"left_child {str(node.root.element)}", left_child)
             if isinstance(node.expression, ApplicationNode):
                 result_aux = self.infer_application_type(node.expression)
                 if not result_aux:
                     return False
-                left_child = self.variable_types[node.expression.element]
+                right_child = self.variable_types[node.expression.element]
             elif isinstance(node.expression, AbstractionNode):
                 result_aux = self.infer_abstraction_type(node.expression)
                 if not result_aux:
                     return False
-                left_child = self.variable_types[node.expression.element]
-            else:
+                right_child = self.variable_types[node.expression.element]
+            elif isinstance(node.expression, FunctionNode):
+                right_child  = self.variable_types[node.expression.element]
+            elif isinstance(node.expression, AtomNode):
+                right_child = self.variable_types[str(node.expression.element)]
 
-                left_child  = self.variable_types[node.expression.element]
-            print("left_child", left_child)
+            print(f"right_child {node.expression.element}", right_child)
             parent_aux = self.variable_types[node.element]
-            print("parent_aux", parent_aux)
+            print(f"parent_aux {node.element}", parent_aux)
             
             result = self.eq_union(left_child, right_child, parent_aux)
             print("This is an application node")
+            print(f"elements are: {node.element}, {node.expression.element}, {node.root.element}")
             print(f"eq: {left_child.type} = {right_child.type} -> {parent_aux.type}")
             print("Results are:", result)
             
-            if parent_aux.type != result[1]:
-                print(f"Assigning to {node.element} the type {result[1]}")
+            if parent_aux.type != result[2]:
+                print(f"Assigning to {node.element} the type {result[2]}")
                 self.variable_types[node.element].assigned_by_user = True
-                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_aux.type, result[1]]], columns=['Old type', 'New type'])])
+                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_aux.type, result[2]]], columns=['Old type', 'New type'])])
             if left_child.type != result[0]:
                 print(f"Assigning to {node.expression.element} the type {result[0]}")
                 self.variable_types[node.expression.element].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child.type, result[0]]], columns=['Old type', 'New type'])])
-            if right_child.type != result[2]:
-                print(f"Assigning to {node.atom.element} the type {result[2]}")
-                self.variable_types[str(node.atom.element)].assigned_by_user = True
-                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child.type, result[2]]], columns=['Old type', 'New type'])])
-
-            self.variable_types[node.element].type = result[1]
-            self.variable_types[node.expression.element].type = result[0]
-            self.variable_types[str(node.atom.element)].type = result[2]
+            if right_child.type != result[1]:
+                print(f"Assigning to {node.root.element} the type {result[1]}")
+                self.variable_types[str(node.root.element)].assigned_by_user = True
+                self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child.type, result[1]]], columns=['Old type', 'New type'])])
+            print(f"Assigning to {node.expression.element} the type {result[1]}")
+            print(f"Variable type is {self.variable_types}")
+            
+                
+            self.variable_types[node.element].type = result[2]
+            self.variable_types[str(node.expression.element)].type = result[1]
+            self.variable_types[str(node.root.element)].type = result[0]
             return True
         else:
             return False
@@ -361,4 +377,10 @@ class hmVisitor(ParseTreeVisitor):
         elif not typeleft.assigned_by_user and not type1.assigned_by_user and not type2.assigned_by_user:
             return (typeleft.type, type1.type, type2.type)
         
-        raise TypeInferenceError("Unknown error in type inference")
+        elif not typeleft.assigned_by_user and not type1.assigned_by_user and type2.assigned_by_user:
+            return(type1.type + '->' + type2.type, type1.type, type2.type)
+            print("ei")
+        
+        print(f"Flag! {typeleft.assigned_by_user} {type1.assigned_by_user} {type2.assigned_by_user}")
+
+        raise TypeInferenceError("Unknown ckrmelwe in type inference")

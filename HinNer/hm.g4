@@ -18,8 +18,8 @@ atom : NUMBER                                                    #atomNumber
      | VARIABLE                                                  #atomVariable
      ;              
 
-application : application atom                                   #applicationComposed
-            | function atom                                      #applicationSimple
+application : application expression                             #applicationComposed
+            | function expression                                #applicationSimple
             ;            
 
 abstraction : LAMBDA VARIABLE ARROW application                  #abstractionAnonimous
