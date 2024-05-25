@@ -26,7 +26,9 @@ abstraction : LAMBDA VARIABLE ARROW application                  #abstractionAno
             ;
 
 
-function : '(' ('+' | '-' | '*' | '/' | '%') ')' ;
+function : '(' ('+' | '-' | '*' | '/' | '%') ')'                 #functionArithmetic
+          | VARIABLE                                             #functionVariable
+          ;
 
 NUMBER : [0-9]+ ;
 VARIABLE : [a-zA-Z][a-zA-Z0-9_]* ;
