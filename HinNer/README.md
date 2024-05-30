@@ -31,7 +31,32 @@ Per executar aquest programa s'ha proporcionat un `Makefile` amb 3 regles:
 
 - **run**: Corre l'aplicació mitjançant streamlit.
 
+## Interface Streamlit
+
+
 ## Que es pot fer?
+Podrem asignar tipus a diferents elements com constants, variables y funcions.
+```Haskell
+2 :: N
+x :: S->S
+(+) :: P->P->P
+sum :: N->N->N
+```
+Les funcions es poden definir amb un nom, o es poden utilitzar aquestes funcions algebraiques:
+- (+)
+- (*)
+- (-)
+- (/)
+- (%)
+Aquestes, a diferencia de les funcions amb nom, s'han de posar entre parentesis.
+
+Al asignar un tipus usant el boto **Evaluate** queda registrat en la memoria cache de streamlit. Aquest romandra a la taula fins que parem l'execució del programa o fins que es cliqui el botó **Reset**.
+
+El boto **Reset** buida totes les variables asignades anteriorment per l'usuari.
+
+### Restriccions
+
+S'obtindrà un TypeInferenceError si es defineix un element amb dues vegades (amb tipus diferents)
 
 ### Casos del enunciat
 **Aplicacions:**
@@ -77,5 +102,35 @@ O per el cas d'una aplicació
 (*) :: N->N->N
 \x -> (+) ((*) 2 x) ((+) 2 2)
 ```
+
+**Tipus Polimorfics**
+S'accepten tipus polimorfics com:
+```Haskell
+2::N
+(+) :: a -> a -> a
+\x -> (+) 2 x
+```
+Que inferira l'aplicació com a un tipus N i conseqüentment l'abstracció com a tipus N->N, però si provem amb un altre tipus com:
+```Haskell
+3::F
+(+) :: a -> a -> a
+\x -> (+) 2 x
+```
+El resultat de l'abstracció es F->F.
+
+Inclus es pot propagar el tipus polimorfic:
+```Haskell
+3::F
+(+) :: a -> a -> a
+(+) x 2
+```
+Amb propagar volem dir que el tipus polimorfic es pot utilitzar per inferir sense necessitat d'un tipus definit.
+
+![Poly Propagation](assets/poly_propagation.png)
+
+Com es pot veure la segona aplicació (+) x, no hi ha cap tipus definit aixi que es propaga x como una a, y @ com a->a, y es resol el tipus polimorfic a la següent aplicació.
+
+
+
 
 

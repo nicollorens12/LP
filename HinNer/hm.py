@@ -12,7 +12,7 @@ def load_type_df():
 
 def main():
     st.markdown("""## HiNer Interpreter Nico Llorens\nIngrese una expresion en el cuadro de texto y presione el botón "Evaluate" para obtener el resultado.""")
-    expression = st.text_area('Expresion', '(+) :: N->N->N')  # \\x->(+) 2 x
+    expression = st.text_area('Expresion', '(+) :: a -> a -> a')  # \\x->(+) 2 x
 
     if 'type_df' not in st.session_state:
         st.session_state.type_df = load_type_df()
