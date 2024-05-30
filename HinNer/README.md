@@ -33,17 +33,49 @@ Per executar aquest programa s'ha proporcionat un `Makefile` amb 3 regles:
 
 ## Que es pot fer?
 
-Aplicacions:
+### Casos del enunciat
+**Aplicacions:**
+```Haskell
+2 :: N
+sum :: N->N->N
+(+) :: N->N->N
 (+) 2 x
-
-Abstraccions:
+sum 2 x
+```
+**Abstraccions:**
+```Haskell
+2 :: N
+sum :: N->N->N
+(+) :: N->N->N
 \x -> (+) 2 x
+\x -> sum 2 x
+```
 
-Aplicacion anidada:
+### Extra
+**Aplicacion anidada:**
+```Haskell
 1::N
 2::N
 3::N
 (+) :: N->N->N
 (\z -> (+) ((+) 1 2) z)
+Combinacio d'aplicacions mirar
+```
+**Combinacio d'aplicacions**
+Per aquest cas necesitem una doble pasada del algoritme d'inferencia per inferir del tot el tipus de la expressió
+```Haskell
+2::N
+(+) :: N->N->N
+(*) :: N->N->N
+(+) ((*) 2 x) ((+) 2 2)
+```
+
+O per el cas d'una aplicació
+```Haskell
+2::N
+(+) :: N->N->N
+(*) :: N->N->N
+\x -> (+) ((*) 2 x) ((+) 2 2)
+```
 
 
