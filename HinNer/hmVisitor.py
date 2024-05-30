@@ -66,8 +66,7 @@ class hmVisitor(ParseTreeVisitor):
             for index, row in self.type_df.iterrows():
                 element = row['Elemento']
                 tipo = row['Tipo']
-                self.variable_types[element] = VariableType(type=tipo, polymorphic=tipo[0].islower() ,assigned_by_user=True)
-
+                self.variable_types[element] = VariableType(type=tipo, polymorphic=self.is_polymorphic(tipo) ,assigned_by_user=True)
         else:
             self.evaluateType = "Error!"
 
@@ -78,14 +77,18 @@ class hmVisitor(ParseTreeVisitor):
         self.evaluateType = 'typeAssign'
         [element, _, type_expression] = list(ctx.getChildren())
         if element.getText() in self.type_df['Elemento'].values:
-
-            raise TypeInferenceError(f"{element.getText()} already has a type assigned")
+            matching_rows = self.type_df.loc[self.type_df['Elemento'] == element.getText()]
+            if not matching_rows.empty:
+                if matching_rows.iloc[0]['Tipo'] != type_expression.getText():
+                    raise TypeInferenceError(f"{element.getText()} already has a different type assigned")
+                else:
+                    return
         else:
             elem = element.getText()
             type_exp = self.visit(type_expression)
             new_row = pd.DataFrame({'Elemento': [elem], 'Tipo': [type_exp]})
             self.type_df = pd.concat([self.type_df, new_row], ignore_index=True)
-            self.variable_types[elem] = VariableType(type=type_exp, polymorphic=type_exp[0].islower() , assigned_by_user=True)
+            self.variable_types[elem] = VariableType(type=type_exp, polymorphic=self.is_polymorphic(type_exp) , assigned_by_user=True)
             print(self.variable_types)
 
     def visitTypeExpressionBasic(self, ctx: hmParser.TypeExpressionBasicContext):
@@ -97,10 +100,9 @@ class hmVisitor(ParseTreeVisitor):
             return type_text
 
     def visitTypeExpressionParenthesis(self, ctx: hmParser.TypeExpressionParenthesisContext):
-        [_,type_expression1,_,_,type_expression2] = list(ctx.getChildren())
-        vtype_expression1 = self.visit(type_expression1)
-        vtype_expression2 = self.visit(type_expression2)
-        return f"({vtype_expression1})->{vtype_expression2}"
+        [_,type_expression,_] = list(ctx.getChildren())
+        return f"({self.visit(type_expression)})"
+
 
     def visitExpressionAtom(self, ctx: hmParser.ExpressionAtomContext):
         [atom] = list(ctx.getChildren())
@@ -180,7 +182,7 @@ class hmVisitor(ParseTreeVisitor):
         else:
             assigned_type = self.current_type
             self.current_type = chr(ord(self.current_type) + 1)
-            self.variable_types[element_str] = VariableType(type=assigned_type, assigned_by_user=False)
+            self.variable_types[element_str] = VariableType(type=assigned_type, polymorphic=self.is_polymorphic(assigned_type) ,assigned_by_user=False)
             return assigned_type
 
     def generate_dot(self, node):
@@ -357,22 +359,27 @@ class hmVisitor(ParseTreeVisitor):
             return False
        
     def eq_union(self, typeleft, type1, type2):
+        if typeleft.type.startswith('(') and typeleft.type.endswith(')'):
+            typeleft.type = typeleft.type[1:-1]
         if typeleft.assigned_by_user and not type1.assigned_by_user and not type2.assigned_by_user:
             print("FLAG!")
             if '->' in typeleft.type:
-                last_arrow_index = typeleft.type.rindex('->')
+                last_arrow_index = self.find_last_arrow_outside_parentheses(typeleft.type)
                 type1_aux = typeleft.type[:last_arrow_index]
                 type2_aux = typeleft.type[last_arrow_index + 2:]
                 print(f"I'm returning {typeleft.type} = {type1_aux} , {type2_aux}")
                 return (typeleft.type, type1_aux, type2_aux)
             raise TypeInferenceError(f"Impossible to infer type for {typeleft.type} vs {type1.type} and {type2.type}")
         elif typeleft.assigned_by_user and type1.assigned_by_user and not type2.assigned_by_user:
-            if typeleft.type.startswith(type1.type):
-                remaining = typeleft.type[len(type1.type):]
-                if remaining.startswith("->"):
-                    remaining = remaining[2:]
-                return (typeleft.type, type1.type, remaining)
-            raise TypeInferenceError(f"Cannot infer: {typeleft.type.split('->')[0]} vs {type1.type.split('->')[0]}")
+            if not typeleft.polymorphic:
+                if typeleft.type.startswith(type1.type):
+                    remaining = typeleft.type[len(type1.type):]
+                    if remaining.startswith("->"):
+                        remaining = remaining[2:]
+                    return (typeleft.type, type1.type, remaining)
+                raise TypeInferenceError(f"Cannot infer: {typeleft.type.split('->')[0]} vs {type1.type.split('->')[0]}")
+            else:
+                return self.infer_polymorphic_type(typeleft.type, type1.type)
         
         elif typeleft.assigned_by_user and not type1.assigned_by_user and type2.assigned_by_user:
             if typeleft.type.endswith(type2.type):
@@ -394,4 +401,42 @@ class hmVisitor(ParseTreeVisitor):
         
         print(f"Flag! {typeleft.assigned_by_user} {type1.assigned_by_user} {type2.assigned_by_user}")
 
-        raise TypeInferenceError("Unknown error in type inference")
+        raise TypeInferenceError(f" Cannot infer type for {typeleft.type} vs {type1.type} and {type2.type}")
+    
+    def find_last_arrow_outside_parentheses(self,type_string):
+        # Inicializa un contador para mantener un registro del número de paréntesis abiertos
+        parenthesis_count = 0
+        # Itera a través del tipo de derecha a izquierda
+        for i in range(len(type_string) - 1, -1, -1):
+            # Si encontramos un paréntesis de cierre, incrementamos el contador
+            if type_string[i] == ')':
+                parenthesis_count += 1
+            # Si encontramos un paréntesis de apertura, decrementamos el contador
+            elif type_string[i] == '(':
+                parenthesis_count -= 1
+            # Si encontramos un operador de flecha y no estamos dentro de paréntesis, lo retornamos
+            elif type_string[i:i + 2] == '->' and parenthesis_count == 0:
+                return i
+        # Si no se encuentra ningún operador de flecha fuera de los paréntesis, retornamos -1
+        return -1
+
+
+    def infer_polymorphic_type(self,polymorphic_type, concrete_type):
+        poly_parts = polymorphic_type.split('->')
+        concrete_parts = concrete_type.split('->')
+        if len(poly_parts) < len(concrete_parts):
+            raise TypeInferenceError(f"Cannot infer type for {polymorphic_type} vs {concrete_type}")
+        var_map = {}
+        for i in range(len(concrete_parts)):
+            if poly_parts[i][0].islower():
+                var_map[poly_parts[i]] = concrete_parts[i]
+            elif poly_parts[i] != concrete_parts[i]:
+                raise TypeInferenceError(f"Cannot infer type for {polymorphic_type} vs {concrete_type}")
+        remaining_type = '->'.join(poly_parts[len(concrete_parts):])
+        for key, value in var_map.items():
+            remaining_type = remaining_type.replace(key, value)
+        print(f"Returning {polymorphic_type} = {concrete_type} -> {remaining_type} with {var_map}")
+        return (polymorphic_type, concrete_type, remaining_type)
+    
+    def is_polymorphic(self, type_string):
+        return any([char.islower() for char in type_string])
