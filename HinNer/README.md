@@ -31,8 +31,6 @@ Per executar aquest programa s'ha proporcionat un `Makefile` amb 3 regles:
 
 - **run**: Corre l'aplicació mitjançant streamlit.
 
-## Interface Streamlit
-
 
 ## Que es pot fer?
 Podrem asignar tipus a diferents elements com constants, variables y funcions.
@@ -50,13 +48,16 @@ Les funcions es poden definir amb un nom, o es poden utilitzar aquestes funcions
 - (%)
 Aquestes, a diferencia de les funcions amb nom, s'han de posar entre parentesis.
 
+## Interface Streamlit
+
 Al asignar un tipus usant el boto **Evaluate** queda registrat en la memoria cache de streamlit. Aquest romandra a la taula fins que parem l'execució del programa o fins que es cliqui el botó **Reset**.
 
 El boto **Reset** buida totes les variables asignades anteriorment per l'usuari.
 
 ### Restriccions
 
-S'obtindrà un TypeInferenceError si es defineix un element amb dues vegades (amb tipus diferents)
+S'obtindrà un ```TypeInferenceError``` si es defineix un element dues vegades (amb tipus diferents), en el cas de que es torni a asignar un tipus pero sigui el mateix que el ja assignat simplement no pasarà re.
+
 
 ### Casos del enunciat
 **Aplicacions:**
@@ -75,6 +76,13 @@ sum :: N->N->N
 \x -> (+) 2 x
 \x -> sum 2 x
 ```
+**Detecció d'error de tipus**
+```Haskell
+2 :: S
+(+) :: N->N->N
+\x -> (+) 2 x
+```
+Resultara en un ```TypeInferenceError: S vs N```
 
 ### Extra
 **Aplicacion anidada:**
