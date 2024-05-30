@@ -84,7 +84,6 @@ sum :: N->N->N
 3::N
 (+) :: N->N->N
 (\z -> (+) ((+) 1 2) z)
-Combinacio d'aplicacions mirar
 ```
 **Combinacio d'aplicacions**
 Per aquest cas necesitem una doble pasada del algoritme d'inferencia per inferir del tot el tipus de la expressió
@@ -126,7 +125,7 @@ Inclus es pot propagar el tipus polimorfic:
 ```
 Amb propagar volem dir que el tipus polimorfic es pot utilitzar per inferir sense necessitat d'un tipus definit.
 
-![Poly Propagation](assets/poly_propagation.png)
+![Poly Propagation](https://i.imgur.com/SJvoujk.png)
 
 Com es pot veure la segona aplicació (+) x, no hi ha cap tipus definit aixi que es propaga x como una a, y @ com a->a, y es resol el tipus polimorfic a la següent aplicació.
 
