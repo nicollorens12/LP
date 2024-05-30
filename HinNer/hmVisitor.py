@@ -34,6 +34,7 @@ class AtomNode:
 @dataclass
 class VariableType:
     type: str
+    polymorphic: bool
     assigned_by_user: bool
 
 
@@ -60,14 +61,12 @@ class hmVisitor(ParseTreeVisitor):
 
     def visitEvaluate(self, ctx: hmParser.EvaluateContext):
         [input, _] = list(ctx.getChildren())
-        if ctx.typeAssign():
-            self.evaluateType = 'typeAssign'
-        elif ctx.expression():
+        if ctx.expression():
             self.evaluateType = 'expression'
             for index, row in self.type_df.iterrows():
                 element = row['Elemento']
                 tipo = row['Tipo']
-                self.variable_types[element] = VariableType(type=tipo, assigned_by_user=True)
+                self.variable_types[element] = VariableType(type=tipo, polymorphic=tipo[0].islower() ,assigned_by_user=True)
 
         else:
             self.evaluateType = "Error!"
@@ -78,11 +77,16 @@ class hmVisitor(ParseTreeVisitor):
     def visitTypeAssign(self, ctx: hmParser.TypeAssignContext):
         self.evaluateType = 'typeAssign'
         [element, _, type_expression] = list(ctx.getChildren())
-        elem = element.getText()
-        type_exp = self.visit(type_expression)
-        new_row = pd.DataFrame({'Elemento': [elem], 'Tipo': [type_exp]})
-        self.type_df = pd.concat([self.type_df, new_row], ignore_index=True)
-        self.variable_types[elem] = VariableType(type=type_exp, assigned_by_user=True)
+        if element.getText() in self.type_df['Elemento'].values:
+
+            raise TypeInferenceError(f"{element.getText()} already has a type assigned")
+        else:
+            elem = element.getText()
+            type_exp = self.visit(type_expression)
+            new_row = pd.DataFrame({'Elemento': [elem], 'Tipo': [type_exp]})
+            self.type_df = pd.concat([self.type_df, new_row], ignore_index=True)
+            self.variable_types[elem] = VariableType(type=type_exp, polymorphic=type_exp[0].islower() , assigned_by_user=True)
+            print(self.variable_types)
 
     def visitTypeExpressionBasic(self, ctx: hmParser.TypeExpressionBasicContext):
         type_text = ctx.VARIABLE().getText()

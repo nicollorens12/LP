@@ -78,4 +78,8 @@ O per el cas d'una aplicació
 \x -> (+) ((*) 2 x) ((+) 2 2)
 ```
 
+### Restriccions
+
+S'obtindrà un TypeInferenceError si es defineix una element com amb mes de dos tipus.
+
 
