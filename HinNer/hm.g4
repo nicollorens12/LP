@@ -22,7 +22,7 @@ application : application expression                             #applicationCom
             | function expression                                #applicationSimple
             ;            
 
-abstraction : LAMBDA VARIABLE ARROW application                  #abstractionAnonimous
+abstraction : LAMBDA VARIABLE ARROW expression                   #abstractionAnonimous
             ;
 
 

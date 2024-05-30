@@ -60,7 +60,6 @@ def main():
                         st.table(visitor.inference_change_table)
                         st.success("Expresion evaluada correctamente")
             except TypeInferenceError as e:
-                
                 st.error(f"Error en la inferencia de tipos:{e.message}")
 
     if reset_button:

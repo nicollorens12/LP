@@ -19,7 +19,7 @@ class ApplicationNode:
 @dataclass
 class AbstractionNode:
     variable: str
-    expression: Union['AbstractionNode', 'FunctionNode']
+    expression: Union['AbstractionNode', 'ApplicationNode','AtomNode']
     element: str  
 
 @dataclass
@@ -368,7 +368,7 @@ class hmVisitor(ParseTreeVisitor):
                 if remaining.startswith("->"):
                     remaining = remaining[2:]
                 return (typeleft.type, type1.type, remaining)
-            raise TypeInferenceError(f"{typeleft.type.split('->')[0]} vs {type1.type.split('->')[0]}")
+            raise TypeInferenceError(f"Cannot infer: {typeleft.type.split('->')[0]} vs {type1.type.split('->')[0]}")
         
         elif typeleft.assigned_by_user and not type1.assigned_by_user and type2.assigned_by_user:
             if typeleft.type.endswith(type2.type):
@@ -387,8 +387,7 @@ class hmVisitor(ParseTreeVisitor):
         
         elif not typeleft.assigned_by_user and not type1.assigned_by_user and type2.assigned_by_user:
             return(type1.type + '->' + type2.type, type1.type, type2.type)
-            print("ei")
         
         print(f"Flag! {typeleft.assigned_by_user} {type1.assigned_by_user} {type2.assigned_by_user}")
 
-        raise TypeInferenceError("Unknown ckrmelwe in type inference")
+        raise TypeInferenceError("Unknown error in type inference")
