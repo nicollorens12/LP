@@ -5,43 +5,40 @@ from hmVisitor import hmVisitor, TypeInferenceError
 import streamlit as st
 import pandas as pd
 
-# Define the function to load and cache the type_df
 @st.cache_data
 def load_type_df():
     return pd.DataFrame(columns=['Elemento', 'Tipo'])
 
 def main():
     st.markdown("""## HiNer Interpreter Nico Llorens\nIngrese una expresion en el cuadro de texto y presione el botón "Evaluate" para obtener el resultado.""")
-    expression = st.text_area('Expresion', '(+) :: a -> a -> a')  # \\x->(+) 2 x
-
+    expression = st.text_area('Expresion', '(+) :: a -> a -> a')
+    
     if 'type_df' not in st.session_state:
         st.session_state.type_df = load_type_df()
-
-    # Create columns for the buttons
+        
     col1, col2 = st.columns(2)
-
     with col1:
         evaluate_button = st.button('Evaluate')
-    
+        
     with col2:
         reset_button = st.button('Reset')
 
     if evaluate_button:
-        input_stream = InputStream(expression)  # Utiliza InputStream en lugar de FileStream
+        input_stream = InputStream(expression)
         lexer = hmLexer(input_stream)
         token_stream = CommonTokenStream(lexer)
         parser = hmParser(token_stream)
         
         tree = parser.evaluate()
         visitor = hmVisitor()
-        visitor.type_df = st.session_state.type_df  # Load cached DataFrame
+        visitor.type_df = st.session_state.type_df
         
         if parser.getNumberOfSyntaxErrors() != 0:
             st.error(f"Se encontraron {parser.getNumberOfSyntaxErrors()} error(es) de sintaxis")
         else:
             try:
                 semantic_tree = visitor.visitEvaluate(tree)
-                st.session_state.type_df = visitor.getTable()  # Update cached DataFrame
+                st.session_state.type_df = visitor.getTable()
                 df = st.session_state.type_df
                 st.table(df)
                 if visitor.evaluateType == 'typeAssign':
@@ -61,7 +58,7 @@ def main():
                         st.success("Expresion evaluada correctamente")
             except TypeInferenceError as e:
                 st.error(f"Error en la inferencia de tipos:{e.message}")
-
+                
     if reset_button:
         st.cache_data.clear()
         st.session_state.type_df = load_type_df()

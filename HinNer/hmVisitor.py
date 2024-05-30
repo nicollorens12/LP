@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import Union
 import pydot
 import pandas as pd
-import re
 
 @dataclass
 class ApplicationNode:
@@ -30,7 +29,6 @@ class FunctionNode:
 class AtomNode:
     element: Union[int, str]
 
-# Clase para manejar los tipos de las variables
 @dataclass
 class VariableType:
     type: str
@@ -45,7 +43,6 @@ class TypeInferenceError(Exception):
 
         
 class hmVisitor(ParseTreeVisitor):
-    
     def __init__(self):
         self.graph = pydot.Dot(graph_type='graph')
         self.aplicationCount = 0
@@ -58,7 +55,7 @@ class hmVisitor(ParseTreeVisitor):
         self.current_type = 'a'
         self.evaluateType = None
         self.inference_change_table = None
-
+        
     def visitEvaluate(self, ctx: hmParser.EvaluateContext):
         [input, _] = list(ctx.getChildren())
         if ctx.expression():
@@ -69,7 +66,7 @@ class hmVisitor(ParseTreeVisitor):
                 self.variable_types[element] = VariableType(type=tipo, polymorphic=self.is_polymorphic(tipo) ,assigned_by_user=True)
         else:
             self.evaluateType = "Error!"
-
+            
         self.root_node = self.visit(input)
         return self.root_node
 
@@ -89,8 +86,7 @@ class hmVisitor(ParseTreeVisitor):
             new_row = pd.DataFrame({'Elemento': [elem], 'Tipo': [type_exp]})
             self.type_df = pd.concat([self.type_df, new_row], ignore_index=True)
             self.variable_types[elem] = VariableType(type=type_exp, polymorphic=self.is_polymorphic(type_exp) , assigned_by_user=True)
-            print(self.variable_types)
-
+            
     def visitTypeExpressionBasic(self, ctx: hmParser.TypeExpressionBasicContext):
         type_text = ctx.VARIABLE().getText()
         if ctx.typeExpression():
@@ -98,7 +94,7 @@ class hmVisitor(ParseTreeVisitor):
             return f"{type_text}->{type_expression}"
         else:
             return type_text
-
+        
     def visitTypeExpressionParenthesis(self, ctx: hmParser.TypeExpressionParenthesisContext):
         [_,type_expression,_] = list(ctx.getChildren())
         return f"({self.visit(type_expression)})"
@@ -169,7 +165,7 @@ class hmVisitor(ParseTreeVisitor):
         return FunctionNode(element=element)
     
     def get_or_assign_type(self,element):
-        element_str = str(element).strip()  # Asegurarse de que el elemento sea un string sin espacios adicionales
+        element_str = str(element).strip()
    
         if element_str in self.type_df['Elemento'].values:
             type_value = self.type_df.loc[self.type_df['Elemento'] == element_str, 'Tipo'].values[0]
@@ -268,21 +264,14 @@ class hmVisitor(ParseTreeVisitor):
             parent_aux = self.variable_types[node.element]
             left_child = self.variable_types[node.variable]
             result = self.eq_union(parent_aux, left_child, right_child)
-            print("This is an abstraction node")
-            print(f"Elements are: {node.element}, {node.variable}, {node.expression.element}")
-            print(f"eq: {left_child.type} = {right_child.type} -> {parent_aux.type}")
-            print("Results are:", result)
 
             if parent_aux.type != result[0]:
-                print(f"Assigning to {node.element} the type {result[0]}")
                 self.variable_types[node.element].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_aux.type, result[0]]], columns=['Old type', 'New type'])])
             if left_child.type != result[2]:
-                print(f"Assigning to {node.variable} the type {result[2]}")
                 self.variable_types[node.variable].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child.type, result[2]]], columns=['Old type', 'New type'])])
             if right_child.type != result[1]:
-                print(f"Assigning to {node.expression.element} the type {result[1]}")
                 self.variable_types[node.expression.element].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child.type, result[1]]], columns=['Old type', 'New type'])])
             
@@ -300,7 +289,6 @@ class hmVisitor(ParseTreeVisitor):
             left_child = None
             right_child = None
             parent_aux = None
-            print(f"Infering types for {node.element}")
             if isinstance(node.root, ApplicationNode):
                 result_aux = self.infer_application_type(node.root)
                 if not result_aux:
@@ -308,8 +296,7 @@ class hmVisitor(ParseTreeVisitor):
                 left_child = self.variable_types[node.root.element]
             elif isinstance(node.root, FunctionNode):
                 left_child = self.variable_types[node.root.element]
-                
-            print(f"left_child {str(node.root.element)}", left_child)
+
             if isinstance(node.expression, ApplicationNode):
                 result_aux = self.infer_application_type(node.expression)
                 if not result_aux:
@@ -325,32 +312,19 @@ class hmVisitor(ParseTreeVisitor):
             elif isinstance(node.expression, AtomNode):
                 right_child = self.variable_types[str(node.expression.element)]
 
-            print(f"right_child {node.expression.element}", right_child)
-            parent_aux = self.variable_types[node.element]
-            print(f"parent_aux {node.element}", parent_aux)
-            
+            parent_aux = self.variable_types[node.element]     
             result = self.eq_union(left_child, right_child, parent_aux)
-            print("This is an application node")
-            print(f"elements are: {node.element}, {node.expression.element}, {node.root.element}")
-            print(f"eq: {left_child.type} = {right_child.type} -> {parent_aux.type}")
-            print("Results are:", result)
             
             if parent_aux.type != result[2]:
-                print(f"Assigning to {node.element} the type {result[2]}")
                 self.variable_types[node.element].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_aux.type, result[2]]], columns=['Old type', 'New type'])])
             if left_child.type != result[0]:
-                print(f"Assigning to {node.expression.element} the type {result[0]}")
                 self.variable_types[node.expression.element].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[left_child.type, result[0]]], columns=['Old type', 'New type'])])
             if right_child.type != result[1]:
-                print(f"Assigning to {node.root.element} the type {result[1]}")
                 self.variable_types[str(node.root.element)].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[right_child.type, result[1]]], columns=['Old type', 'New type'])])
-            print(f"Assigning to {node.expression.element} the type {result[1]}")
-            print(f"Variable type is {self.variable_types}")
-            
-                
+           
             self.variable_types[node.element].type = result[2]
             self.variable_types[str(node.expression.element)].type = result[1]
             self.variable_types[str(node.root.element)].type = result[0]
@@ -362,12 +336,10 @@ class hmVisitor(ParseTreeVisitor):
         if typeleft.type.startswith('(') and typeleft.type.endswith(')'):
             typeleft.type = typeleft.type[1:-1]
         if typeleft.assigned_by_user and not type1.assigned_by_user and not type2.assigned_by_user:
-            print("FLAG!")
             if '->' in typeleft.type:
                 last_arrow_index = self.find_last_arrow_outside_parentheses(typeleft.type)
                 type1_aux = typeleft.type[:last_arrow_index]
                 type2_aux = typeleft.type[last_arrow_index + 2:]
-                print(f"I'm returning {typeleft.type} = {type1_aux} , {type2_aux}")
                 return (typeleft.type, type1_aux, type2_aux)
             raise TypeInferenceError(f"Impossible to infer type for {typeleft.type} vs {type1.type} and {type2.type}")
         elif typeleft.assigned_by_user and type1.assigned_by_user and not type2.assigned_by_user:
@@ -380,7 +352,6 @@ class hmVisitor(ParseTreeVisitor):
                 raise TypeInferenceError(f"Cannot infer: {typeleft.type.split('->')[0]} vs {type1.type.split('->')[0]}")
             else:
                 return self.infer_polymorphic_type(typeleft.type, type1.type)
-        
         elif typeleft.assigned_by_user and not type1.assigned_by_user and type2.assigned_by_user:
             if typeleft.type.endswith(type2.type):
                 remaining = typeleft.type[:-len(type2.type)]
@@ -390,7 +361,6 @@ class hmVisitor(ParseTreeVisitor):
             raise TypeInferenceError(f"{typeleft.type.split('->')[0]} vs {type2.type.split('->')[0]}")
         
         elif not typeleft.assigned_by_user and type1.assigned_by_user and type2.assigned_by_user:
-            #make typeleft.assign_by_user = True??
             return(type1.type + '->' + type2.type, type1.type, type2.type)
         
         elif not typeleft.assigned_by_user and not type1.assigned_by_user and not type2.assigned_by_user:
@@ -399,27 +369,18 @@ class hmVisitor(ParseTreeVisitor):
         elif not typeleft.assigned_by_user and not type1.assigned_by_user and type2.assigned_by_user:
             return(type1.type + '->' + type2.type, type1.type, type2.type)
         
-        print(f"Flag! {typeleft.assigned_by_user} {type1.assigned_by_user} {type2.assigned_by_user}")
-
         raise TypeInferenceError(f" Cannot infer type for {typeleft.type} vs {type1.type} and {type2.type}")
     
     def find_last_arrow_outside_parentheses(self,type_string):
-        # Inicializa un contador para mantener un registro del número de paréntesis abiertos
         parenthesis_count = 0
-        # Itera a través del tipo de derecha a izquierda
         for i in range(len(type_string) - 1, -1, -1):
-            # Si encontramos un paréntesis de cierre, incrementamos el contador
             if type_string[i] == ')':
                 parenthesis_count += 1
-            # Si encontramos un paréntesis de apertura, decrementamos el contador
             elif type_string[i] == '(':
                 parenthesis_count -= 1
-            # Si encontramos un operador de flecha y no estamos dentro de paréntesis, lo retornamos
             elif type_string[i:i + 2] == '->' and parenthesis_count == 0:
                 return i
-        # Si no se encuentra ningún operador de flecha fuera de los paréntesis, retornamos -1
         return -1
-
 
     def infer_polymorphic_type(self,polymorphic_type, concrete_type):
         poly_parts = polymorphic_type.split('->')
@@ -435,7 +396,6 @@ class hmVisitor(ParseTreeVisitor):
         remaining_type = '->'.join(poly_parts[len(concrete_parts):])
         for key, value in var_map.items():
             remaining_type = remaining_type.replace(key, value)
-        print(f"Returning {polymorphic_type} = {concrete_type} -> {remaining_type} with {var_map}")
         return (polymorphic_type, concrete_type, remaining_type)
     
     def is_polymorphic(self, type_string):
