@@ -31,6 +31,12 @@ Per executar aquest programa s'ha proporcionat un `Makefile` amb 3 regles:
 
 - **run**: Corre l'aplicació mitjançant streamlit.
 
+Sense el makefile per compilar la gràmatica amb visitador
+```antlr4 -Dlanguage=Python3 -no-listener -visitor hm.g4```
+Sense visitador:
+```antlr4 -Dlanguage=Python3 -no-listener hm.g4```
+I per correr el programa (un cop haguem compilat la gramatica):
+```streamlit run hm.py```
 
 ## Que es pot fer?
 Podrem asignar tipus a diferents elements com constants, variables y funcions.
