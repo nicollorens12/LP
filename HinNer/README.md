@@ -25,16 +25,15 @@ pip install pandas
 ## Execució
 
 Per executar aquest programa s'ha proporcionat un `Makefile` amb 3 regles:
-- **all**: 	:warning: Aquesta regla fara de la gramatica un lexer, un parser i un **visitor**. Per tant eliminar el visitor proporcionat. Esta pensat per noves implementacions
+- **all**: Aquesta regla fara de la gramatica un lexer, un parser i un **visitor** buit. No substitueix el visitor implmentat.
 
 - **novisitor**: Aquesta regla fara de la gramatica un lexer i un parser corresponent, però no fara un nou visitor.
 
 - **run**: Corre l'aplicació mitjançant streamlit.
 
-Sense el makefile per compilar la gràmatica amb visitador
+Sense el makefile per compilar la gràmatica:
 ```antlr4 -Dlanguage=Python3 -no-listener -visitor hm.g4```
-Sense visitador:
-```antlr4 -Dlanguage=Python3 -no-listener hm.g4```
+
 I per correr el programa (un cop haguem compilat la gramatica):
 ```streamlit run hm.py```
 
