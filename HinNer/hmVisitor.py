@@ -176,10 +176,18 @@ class hmVisitor(ParseTreeVisitor):
         elif element_str in self.variable_types:
             return self.variable_types[element_str].type
         else:
+            
+            while self.check_type_availability():
+                self.current_type = chr(ord(self.current_type) + 1)
+            if self.current_type == 'z':
+                raise TypeInferenceError("Cannot infer more types")
             assigned_type = self.current_type
             self.current_type = chr(ord(self.current_type) + 1)
-            self.variable_types[element_str] = VariableType(type=assigned_type, polymorphic=self.is_polymorphic(assigned_type) ,assigned_by_user=False)
+            self.variable_types[element_str] = VariableType(type=assigned_type, polymorphic=False ,assigned_by_user=False)
             return assigned_type
+        
+    def check_type_availability(self):
+        return any(self.current_type in var_type.type for var_type in self.variable_types.values())
 
     def generate_dot(self, node):
         root_node = None
@@ -314,7 +322,7 @@ class hmVisitor(ParseTreeVisitor):
 
             parent_aux = self.variable_types[node.element]     
             result = self.eq_union(left_child, right_child, parent_aux)
-            
+
             if parent_aux.type != result[2]:
                 self.variable_types[node.element].assigned_by_user = True
                 self.inference_change_table = pd.concat([self.inference_change_table, pd.DataFrame([[parent_aux.type, result[2]]], columns=['Old type', 'New type'])])
@@ -333,15 +341,27 @@ class hmVisitor(ParseTreeVisitor):
             return False
        
     def eq_union(self, typeleft, type1, type2):
+
         if typeleft.type.startswith('(') and typeleft.type.endswith(')'):
             typeleft.type = typeleft.type[1:-1]
+
         if typeleft.assigned_by_user and not type1.assigned_by_user and not type2.assigned_by_user:
-            if '->' in typeleft.type:
-                last_arrow_index = self.find_last_arrow_outside_parentheses(typeleft.type)
-                type1_aux = typeleft.type[:last_arrow_index]
-                type2_aux = typeleft.type[last_arrow_index + 2:]
-                return (typeleft.type, type1_aux, type2_aux)
-            raise TypeInferenceError(f"Impossible to infer type for {typeleft.type} vs {type1.type} and {type2.type}")
+            if not typeleft.polymorphic:
+                if '->' in typeleft.type:
+                    last_arrow_index = self.find_last_arrow_outside_parentheses(typeleft.type)
+                    type2_aux = typeleft.type[:last_arrow_index]
+                    type1_aux = typeleft.type[last_arrow_index + 2:]
+                    return (typeleft.type, type1_aux, type2_aux)
+                raise TypeInferenceError(f" Impossible to infer type for {typeleft.type} vs {type1.type} and {type2.type}")
+            else:
+                result = self.infer_polymorphic_type_simple(typeleft.type)
+                type1.type = result[1]
+                type1.polymorphic = True
+                type2.type = result[2]
+                type2.polymorphic = True
+                return (typeleft.type, type1.type, type2.type)
+            
+        
         elif typeleft.assigned_by_user and type1.assigned_by_user and not type2.assigned_by_user:
             if not typeleft.polymorphic:
                 if typeleft.type.startswith(type1.type):
@@ -349,9 +369,11 @@ class hmVisitor(ParseTreeVisitor):
                     if remaining.startswith("->"):
                         remaining = remaining[2:]
                     return (typeleft.type, type1.type, remaining)
-                raise TypeInferenceError(f"Cannot infer: {typeleft.type.split('->')[0]} vs {type1.type.split('->')[0]}")
+                raise TypeInferenceError(f" Cannot infer: {typeleft.type.split('->')[0]} vs {type1.type.split('->')[0]}")
             else:
-                return self.infer_polymorphic_type(typeleft.type, type1.type)
+                result = self.infer_polymorphic_type(typeleft.type,type1.type)
+                
+                return result
         elif typeleft.assigned_by_user and not type1.assigned_by_user and type2.assigned_by_user:
             if typeleft.type.endswith(type2.type):
                 remaining = typeleft.type[:-len(type2.type)]
@@ -359,6 +381,7 @@ class hmVisitor(ParseTreeVisitor):
                     remaining = remaining[:-2]
                 return (typeleft.type, remaining, type2.type)
             raise TypeInferenceError(f"{typeleft.type.split('->')[0]} vs {type2.type.split('->')[0]}")
+            
         
         elif not typeleft.assigned_by_user and type1.assigned_by_user and type2.assigned_by_user:
             return(type1.type + '->' + type2.type, type1.type, type2.type)
@@ -369,8 +392,13 @@ class hmVisitor(ParseTreeVisitor):
         elif not typeleft.assigned_by_user and not type1.assigned_by_user and type2.assigned_by_user:
             return(type1.type + '->' + type2.type, type1.type, type2.type)
         
-        raise TypeInferenceError(f" Cannot infer type for {typeleft.type} vs {type1.type} and {type2.type}")
-    
+        elif not typeleft.assigned_by_user and type1.assigned_by_user and not type2.assigned_by_user:
+            if typeleft.polymorphic:
+                return self.infer_polymorphic_type(typeleft.type, type1.type)
+            else:
+                return (type1.type + '->' + type2.type, type1.type, type2.type)
+
+                
     def find_last_arrow_outside_parentheses(self,type_string):
         parenthesis_count = 0
         for i in range(len(type_string) - 1, -1, -1):
@@ -397,6 +425,13 @@ class hmVisitor(ParseTreeVisitor):
         for key, value in var_map.items():
             remaining_type = remaining_type.replace(key, value)
         return (polymorphic_type, concrete_type, remaining_type)
+    
+    def infer_polymorphic_type_simple(self, polymorphic_type):
+        type_parts = polymorphic_type.split('->')
+        type1 = type_parts[0]
+        type2 = '->'.join(type_parts[1:])
+        return (polymorphic_type, type1, type2)
+
     
     def is_polymorphic(self, type_string):
         return any([char.islower() for char in type_string])

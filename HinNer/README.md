@@ -131,13 +131,23 @@ Que inferira l'aplicació com a un tipus N i conseqüentment l'abstracció com a
 ```
 El resultat de l'abstracció es F->F.
 
-Inclus es pot propagar el tipus polimorfic (NO VA!):
+Inclus es pot propagar el tipus polimorfic:
 ```Haskell
 3::F
 (+) :: a -> a -> a
 (+) x 3
 ```
+
+O amb abstraccions:
+```Haskell
+3::F
+(+) :: a -> a -> a
+\x -> (+) x 3
+```
+
 Amb propagar volem dir que el tipus polimorfic es pot utilitzar per inferir sense necessitat d'un tipus definit.
+
+A més a més, quan es fa la primera asignació provisional als elements els quals l'usuari no ha assignat tipus, és té en compte que no s'assigni per exemple el tipus 'a' de forma provisional a una aplicacio, si (+) :: a -> a -> a s'ha definit ja que no tenen perque ser el mateix tipus. 
 
 ![Poly Propagation](https://i.imgur.com/SJvoujk.png)
 
