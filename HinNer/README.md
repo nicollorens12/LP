@@ -125,17 +125,17 @@ S'accepten tipus polimorfics com:
 ```
 Que inferira l'aplicació com a un tipus N i conseqüentment l'abstracció com a tipus N->N, però si provem amb un altre tipus com:
 ```Haskell
-3::F
+2::F
 (+) :: a -> a -> a
 \x -> (+) 2 x
 ```
 El resultat de l'abstracció es F->F.
 
-Inclus es pot propagar el tipus polimorfic:
+Inclus es pot propagar el tipus polimorfic (NO VA!):
 ```Haskell
 3::F
 (+) :: a -> a -> a
-(+) x 2
+(+) x 3
 ```
 Amb propagar volem dir que el tipus polimorfic es pot utilitzar per inferir sense necessitat d'un tipus definit.
 

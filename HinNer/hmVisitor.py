@@ -70,7 +70,7 @@ class hmVisitor(ParseTreeVisitor):
         self.root_node = self.visit(input)
         return self.root_node
 
-    def visitTypeAssign(self, ctx: hmParser.TypeAssignContext):
+    def visitTypeAssign(self, ctx:hmParser.TypeAssignContext):
         self.evaluateType = 'typeAssign'
         [element, _, type_expression] = list(ctx.getChildren())
         if element.getText() in self.type_df['Elemento'].values:
